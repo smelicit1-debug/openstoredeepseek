@@ -468,7 +468,7 @@ async function runFlow(raw) {
     renderBrand(a.analysis);
 
     showStatus('Sourcing products & verifying real supplier listings...');
-    const s = await fetchJson('/api/source', {
+    let s = await fetchJson('/api/source', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: currentSessionId, analysis: a.analysis }),

@@ -11,7 +11,7 @@ const cookieParser = require('cookie-parser');
 
 const { getSupabase } = require('./src/lib/supabase');
 const { requireAuth, optionalAuth, generateToken } = require('./src/lib/auth');
-const { callKimi } = require('./src/lib/ai');
+const { callKimi, reviewProducts } = require('./src/lib/ai');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -39,14 +39,14 @@ if (STRIPE_SECRET_KEY) {
 const memorySessions = new Map();
 
 function getSession(sessionId) {
-  const sb = getSupabase();
-  if (sb) return null; // Will be fetched from DB instead
-  return memorySessions.get(sessionId) || null;
+  // Check memory first (always, even if Supabase is configured)
+  const mem = memorySessions.get(sessionId);
+  if (mem) return mem;
+  // If Supabase is configured, the caller will fetch from DB instead
+  return null;
 }
 
 function setSession(sessionId, data) {
-  const sb = getSupabase();
-  if (sb) return; // Will be saved to DB instead
   memorySessions.set(sessionId, data);
 }
 
@@ -658,6 +658,13 @@ app.post('/api/source', optionalAuth, async (req, res) => {
       if (sb && req.user) {
         await sb.from('sessions').insert({ id: sid, user_id: req.user.id, analysis: workingAnalysis, products, created_at: new Date().toISOString() });
       }
+    }
+
+    // Run review agent to improve product quality
+    try {
+      products = await reviewProducts(workingAnalysis, products);
+    } catch (err) {
+      console.error('[reviewAgent] failed, using original:', err.message);
     }
 
     res.json({ sessionId: sid, products });
