@@ -122,6 +122,13 @@
 
   .brand-section { margin-bottom: 2rem; }
   .brand-section h2 { font-family: 'Syne', sans-serif; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; }
+  .qa-card { border: 1px solid var(--border-jade); border-radius: 12px; padding: 1.25rem; background: rgba(0,229,160,0.03); }
+  .qa-card h3 { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--jade); }
+  .qa-row { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.4rem 0; font-size: 0.9rem; }
+  .qa-row .qa-icon { flex-shrink: 0; width: 1.2rem; text-align: center; }
+  .qa-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-family: 'IBM Plex Mono', monospace; margin-right: 0.25rem; }
+  .qa-badge.green { background: rgba(0,229,160,0.15); color: var(--jade); }
+  .qa-badge.amber { background: rgba(255,181,71,0.15); color: var(--amber); }
   .brand-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg2); }
   .ba-field { display: flex; border-bottom: 1px solid var(--border); }
   .ba-field:last-child { border-bottom: none; }
@@ -306,6 +313,9 @@
       <h2 id="brandHeading">Brand Analysis</h2>
       <div class="brand-card" id="brandCard"></div>
     </div>
+    <div class="qa-section" id="qaSection" style="display:none;margin-bottom:2rem;">
+      <div class="qa-card" id="qaCard"></div>
+    </div>
     <div class="products-section">
       <div class="products-header">
         <h2>Sourced Products</h2>
@@ -482,6 +492,7 @@ async function runFlow(raw) {
 
     currentSessionId = s.sessionId || currentSessionId;
     renderProducts(s.products);
+    renderQASummary(s.qa);
     hideStatus();
     revealBody();
     document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -551,6 +562,7 @@ function addField(label, value) {
 
 function renderProducts(products) {
   currentProducts = products || [];
+  document.getElementById('qaSection').style.display = 'none';
   const grid = document.getElementById('productGrid');
   grid.innerHTML = '';
   const total = products.length;
@@ -585,6 +597,21 @@ function renderProducts(products) {
     }
     grid.appendChild(card);
   });
+}
+
+function renderQASummary(qa) {
+  const section = document.getElementById('qaSection');
+  const card = document.getElementById('qaCard');
+  if (!qa || !qa.totalProducts) { section.style.display = 'none'; return; }
+  card.innerHTML = '<h3>✦ Agent QA Summary</h3>' +
+    '<div class="qa-row"><span class="qa-icon">📊</span><span>' + qa.totalProducts + ' products sourced from <span class="qa-badge green">' + escHtml(qa.supplierMix || 'various') + '</span></span></div>' +
+    '<div class="qa-row"><span class="qa-icon">✅</span><span>Links verified: <strong>' + qa.linksVerified + '</strong> · Avg margin: <strong>' + qa.avgMargin + '</strong></span></div>' +
+    (qa.topPick ? '<div class="qa-row"><span class="qa-icon">🏆</span><span><strong>' + escHtml(qa.topPick) + '</strong> — ' + qa.topPickPrice + ' (' + qa.topPickMargin + ')</span></div>' : '') +
+    (qa.whyTopPick ? '<div class="qa-row"><span class="qa-icon">💡</span><span>' + escHtml(qa.whyTopPick) + '</span></div>' : '') +
+    (qa.flag && qa.flag !== 'None' ? '<div class="qa-row"><span class="qa-icon">⚠️</span><span class="qa-badge amber">Flag</span> ' + escHtml(qa.flag) + '</div>' : '') +
+    (qa.actionableTip ? '<div class="qa-row"><span class="qa-icon">🎯</span><span>' + escHtml(qa.actionableTip) + '</span></div>' : '') +
+    (qa.summary ? '<div class="qa-row" style="margin-top:0.5rem;padding-top:0.75rem;border-top:1px solid var(--border);color:var(--muted);font-size:0.85rem;"><span class="qa-icon">📝</span><span>' + escHtml(qa.summary) + '</span></div>' : '');
+  section.style.display = 'block';
 }
 
 function openProductModal(index) {

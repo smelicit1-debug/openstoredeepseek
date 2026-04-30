@@ -15,7 +15,7 @@ function getKimi() {
   return kimi;
 }
 
-const MODEL = process.env.KIMI_MODEL || 'moonshot-v1-8k';
+const MODEL = process.env.KIMI_MODEL || 'moonshot-v1-32k';
 
 async function callKimi(prompt, maxTokens = 1024) {
   const client = getKimi();
@@ -104,6 +104,14 @@ async function reviewProducts(analysis, products) {
   const priceMin = priceRange?.min ? `$${priceRange.min}` : 'unknown';
   const priceMax = priceRange?.max ? `$${priceRange.max}` : 'unknown';
 
+  // Strip heavy fields before sending to AI to avoid token limits
+  const stripped = products.map(p => ({
+    name: p.name, emoji: p.emoji, costPrice: p.costPrice, sellPrice: p.sellPrice,
+    marginPercent: p.marginPercent, supplier: p.supplier, description: p.description,
+    searchQuery: p.searchQuery, chineseName: p.chineseName, imagePrompt: p.imagePrompt,
+    moqEstimate: p.moqEstimate, leadTime: p.leadTime,
+  }));
+
   const prompt = `You are a senior product sourcing quality reviewer. Review and refine these AI-generated products to make them accurate, profitable, and actionable for a dropshipper or store owner.
 
 Brand context:
@@ -119,8 +127,8 @@ For EACH product, review:
 4. SEARCH QUERIES — Would the English and Chinese queries find real products on Alibaba/1688? Improve if too generic or off-target.
 5. SUPPLIER FIT — apparel→1688 or Alibaba, electronics→CJ or Alibaba, accessories→any. Move products to more suitable suppliers if needed.
 
-Current products:
-${JSON.stringify(products, null, 2)}
+Current products (stripped of heavy fields):
+${JSON.stringify(stripped, null, 2)}
 
 Return ONLY a strict JSON array — same structure, same fields, with improved values. Keep ALL fields: name, emoji, costPrice, sellPrice, marginPercent, supplier, description, searchQuery, chineseName, imagePrompt, moqEstimate, leadTime. Do NOT change the number of products. Valid JSON only, no prose, no code fences.`;
 
@@ -160,4 +168,62 @@ Return ONLY a strict JSON array — same structure, same fields, with improved v
   }
 }
 
-module.exports = { callKimi, getKimi, reviewProducts, verifyProductLinks };
+/**
+ * Final QA review: analyzes sourced products and returns a summary with
+ * top picks, flags, and actionable recommendations.
+ */
+async function qaReview(analysis, products) {
+  if (!products || !products.length) return null;
+
+  const verified = products.filter(p => p.linkVerified).length;
+  const avgMargin = Math.round(products.reduce((s, p) => s + (p.marginPercent || 0), 0) / products.length);
+  const bestMargin = products.reduce((best, p) => (p.marginPercent || 0) > (best.marginPercent || 0) ? p : best, products[0]);
+  const cheapest = products.reduce((best, p) => (p.costPrice || Infinity) < (best.costPrice || Infinity) ? p : best, products[0]);
+
+  // Build a short summary prompt
+  const summary = {
+    totalProducts: products.length,
+    linksVerified: `${verified}/${products.length}`,
+    avgMargin: `${avgMargin}%`,
+    topPick: bestMargin?.name || '',
+    topPickMargin: `${bestMargin?.marginPercent || 0}%`,
+    topPickPrice: `$${bestMargin?.costPrice || 0} → $${bestMargin?.sellPrice || 0}`,
+    cheapestProduct: cheapest?.name || '',
+    cheapestCost: `$${cheapest?.costPrice || 0}`,
+    bestMarginSell: `$${bestMargin?.sellPrice || 0}`,
+    supplierMix: [...new Set(products.map(p => p.supplier).filter(Boolean))].join(', '),
+  };
+
+  // Get AI-generated tips
+  const prompt = `You are a senior sourcing consultant. Review these products sourced for a brand and return a short actionable summary.
+
+Brand: ${analysis?.brandName || 'Unknown'} (${analysis?.niche || 'N/A'})
+Target: ${analysis?.targetAudience || 'N/A'}
+
+Products (${products.length} total, ${verified} with verified links):
+${products.map((p, i) => `${i+1}. ${p.emoji} ${p.name} - $${p.costPrice}→$${p.sellPrice} (${p.marginPercent}%) - ${p.supplier}${p.linkVerified ? ' ✅' : ' ❌'}`).join('\n')}
+
+Return ONLY valid JSON with exactly these fields, no prose:
+{
+  "summary": "One sentence overall assessment (15 words max)",
+  "topPick": "Top pick name",
+  "whyTopPick": "Why this is the best product to start with (12 words max)",
+  "flag": "One thing to watch out for, or 'None'",
+  "actionableTip": "One concrete next step for the buyer (12 words max)"
+}`;
+
+  try {
+    const text = await callKimi(prompt, 512);
+    let cleaned = text.trim();
+    if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1) cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+    const tips = JSON.parse(cleaned);
+    return { ...summary, ...tips };
+  } catch {
+    return summary;
+  }
+}
+
+module.exports = { callKimi, getKimi, reviewProducts, verifyProductLinks, qaReview };

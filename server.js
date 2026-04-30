@@ -11,7 +11,7 @@ const cookieParser = require('cookie-parser');
 
 const { getSupabase } = require('./src/lib/supabase');
 const { requireAuth, optionalAuth, generateToken } = require('./src/lib/auth');
-const { callKimi, reviewProducts, verifyProductLinks } = require('./src/lib/ai');
+const { callKimi, reviewProducts, verifyProductLinks, qaReview } = require('./src/lib/ai');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -674,7 +674,16 @@ app.post('/api/source', optionalAuth, async (req, res) => {
       console.error('[linkVerifier] failed:', err.message);
     }
 
-    res.json({ sessionId: sid, products });
+    // Final QA review
+    let qaResult = null;
+    try {
+      qaResult = await qaReview(workingAnalysis, products);
+      if (qaResult) console.log('[qaReview] Summary generated ✓');
+    } catch (err) {
+      console.error('[qaReview] failed:', err.message);
+    }
+
+    res.json({ sessionId: sid, products, qa: qaResult });
   } catch (err) {
     console.error('source error:', err.message);
     res.status(500).json({ error: err.message || 'Failed to source products.' });
