@@ -397,6 +397,23 @@ app.post('/api/auth/register', async (req, res) => {
     const { data, error } = await sb.auth.signUp({ email, password });
     if (error) return res.status(400).json({ error: error.message });
 
+    // Auto-confirm the user (skip email verification)
+    try {
+      await sb.auth.admin.updateUserById(data.user.id, { email_confirm: true });
+    } catch {
+      // Fallback: use direct REST call
+      await axios.put(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users/${data.user.id}`,
+        { email_confirm: true },
+        {
+          headers: {
+            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+        }
+      ).catch(() => {});
+    }
+
     // Create user profile
     await sb.from('users').upsert({ id: data.user.id, email, tier: 'free', uses_this_month: 0, created_at: new Date().toISOString() });
 
