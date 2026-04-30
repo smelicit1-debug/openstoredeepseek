@@ -403,6 +403,12 @@
       <div class="modal-stat"><div class="modal-stat-label">Supplier</div><div class="modal-stat-value" id="pmSupplier"></div></div>
     </div>
     <div class="modal-links" id="pmLinks"></div>
+    <div class="pm-deep-section" id="pmDeepSection" style="display:none;margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem;">
+      <div class="pm-deep-body" id="pmDeepBody"></div>
+    </div>
+    <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+      <button class="action-btn primary" id="pmDeepBtn" onclick="runDeepSearch()" style="flex:1;">🔬 Deep Supplier Research →</button>
+    </div>
   </div>
 </div>
 
@@ -582,6 +588,7 @@ function renderProducts(products) {
 }
 
 function openProductModal(index) {
+  openProductIndex = index;
   const p = currentProducts[index];
   if (!p) return;
   document.getElementById('pmEmoji').textContent = p.emoji || '📦';
@@ -613,6 +620,73 @@ function openProductModal(index) {
 }
 
 function closeProductModal() { document.getElementById('productModal').style.display = 'none'; }
+
+// Deep Supplier Research
+let openProductIndex = -1;
+
+async function runDeepSearch() {
+  if (openProductIndex < 0 || !currentSessionId) {
+    document.getElementById('signupPrompt').style.display = 'flex';
+    return;
+  }
+  // Check if logged in
+  const token = localStorage.getItem('os_token');
+  if (!token) {
+    document.getElementById('signupPrompt').style.display = 'flex';
+    return;
+  }
+  
+  document.getElementById('pmDeepBtn').disabled = true;
+  document.getElementById('pmDeepBtn').textContent = '🔍 Researching suppliers...';
+  document.getElementById('pmDeepSection').style.display = 'block';
+  document.getElementById('pmDeepBody').innerHTML = '<div class="pm-deep-loading">Searching supplier databases for better matches...</div>';
+
+  try {
+    const data = await fetchJson('/api/deep-search', {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: currentSessionId, productIndex: openProductIndex }),
+    });
+    
+    let html = '';
+    if (Array.isArray(data.realListings) && data.realListings.length) {
+      html += '<div class="pm-deep-block"><h5>✦ Supplier listings found</h5><div class="pm-listings">' +
+        data.realListings.map(l => 
+          '<a class="pm-listing" href="' + escAttr(l.url) + '" target="_blank" rel="noopener">' +
+          '<div class="pm-listing-head"><span class="pm-listing-supplier">' + escHtml(l.supplier || 'web') + '</span></div>' +
+          '<div class="pm-listing-title">' + escHtml(l.title || l.url) + '</div>' +
+          '<div class="pm-listing-url">' + escHtml(l.url) + '</div></a>'
+        ).join('') + '</div></div>';
+    }
+    if (Array.isArray(data.alternatives) && data.alternatives.length) {
+      html += '<div class="pm-deep-block"><h5>Alternative product variants</h5>' +
+        data.alternatives.map(alt => 
+          '<div class="pm-alt"><div class="pm-alt-name">' + escHtml(alt.name) + '</div>' +
+          '<div class="pm-alt-why">' + escHtml(alt.why) + '</div></div>'
+        ).join('') + '</div>';
+    }
+    if (Array.isArray(data.supplierTips) && data.supplierTips.length) {
+      html += '<div class="pm-deep-block"><h5>Supplier tips</h5><ul>' +
+        data.supplierTips.map(t => '<li>' + escHtml(t) + '</li>').join('') + '</ul></div>';
+    }
+    if (Array.isArray(data.qualityRisks) && data.qualityRisks.length) {
+      html += '<div class="pm-deep-block"><h5>Quality risks</h5><ul>' +
+        data.qualityRisks.map(r => '<li>' + escHtml(r) + '</li>').join('') + '</ul></div>';
+    }
+    
+    document.getElementById('pmDeepBody').innerHTML = html || '<div class="pm-deep-block">No additional supplier data found.</div>';
+  } catch (err) {
+    document.getElementById('pmDeepBody').innerHTML = '<div class="pm-deep-block">Deep search requires an account. <a href="/login?signup=1" style="color:var(--jade);">Sign up free →</a></div>';
+  } finally {
+    document.getElementById('pmDeepBtn').disabled = false;
+    document.getElementById('pmDeepBtn').textContent = '🔬 Deep Supplier Research →';
+  }
+}
+
+function authHeaders() {
+  const t = localStorage.getItem('os_token');
+  return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
 
 document.getElementById('tryAnotherBtn').addEventListener('click', () => {
   if (hasUsedOnce() && !TOKEN) {

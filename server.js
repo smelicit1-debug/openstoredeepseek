@@ -11,7 +11,7 @@ const cookieParser = require('cookie-parser');
 
 const { getSupabase } = require('./src/lib/supabase');
 const { requireAuth, optionalAuth, generateToken } = require('./src/lib/auth');
-const { callKimi, reviewProducts } = require('./src/lib/ai');
+const { callKimi, reviewProducts, verifyProductLinks } = require('./src/lib/ai');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -634,7 +634,7 @@ app.post('/api/source', optionalAuth, async (req, res) => {
 
     if (!workingAnalysis) return res.status(400).json({ error: 'Brand analysis is required. Run /api/analyze first.' });
 
-    const products = await sourceProducts(workingAnalysis);
+    let products = await sourceProducts(workingAnalysis);
     if (!products.length) {
       return res.status(502).json({ error: 'No verifiable supplier listings were found for this brand. Try a different URL or rerun in a moment.' });
     }
@@ -665,6 +665,13 @@ app.post('/api/source', optionalAuth, async (req, res) => {
       products = await reviewProducts(workingAnalysis, products);
     } catch (err) {
       console.error('[reviewAgent] failed, using original:', err.message);
+    }
+
+    // Verify supplier links and images are real
+    try {
+      products = await verifyProductLinks(products);
+    } catch (err) {
+      console.error('[linkVerifier] failed:', err.message);
     }
 
     res.json({ sessionId: sid, products });
