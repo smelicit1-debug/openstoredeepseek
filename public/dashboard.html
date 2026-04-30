@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — OpenStore.ai</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  :root {
+    --bg: #06080D; --bg2: #0C1018; --bg3: #121820;
+    --jade: #00E5A0; --jade2: #00C285; --amber: #FFB547;
+    --text: #F0F4FF; --muted: #8892A4; --error: #FF5470;
+    --border: rgba(255,255,255,0.07); --border-jade: rgba(0,229,160,0.25);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 16px; line-height: 1.6;
+    min-height: 100vh;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,229,160,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,160,0.02) 1px, transparent 1px);
+    background-size: 60px 60px; pointer-events: none; z-index: 0;
+  }
+  * { position: relative; z-index: 1; }
+
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 2rem; border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px); background: rgba(6,8,13,0.8);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 800; text-decoration: none; color: var(--text); }
+  .logo span { color: var(--jade); }
+  .nav-right { display: flex; align-items: center; gap: 1rem; }
+  .nav-user { font-size: 0.85rem; color: var(--muted); }
+  .nav-tier { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: rgba(0,229,160,0.1); color: var(--jade); text-transform: uppercase; letter-spacing: 0.05em; }
+  .nav-tier.free { background: rgba(255,181,71,0.1); color: var(--amber); }
+
+  .dashboard { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
+  /* Usage bar */
+  .usage-bar {
+    border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem;
+    background: var(--bg2); margin-bottom: 2rem; display: flex;
+    align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+  }
+  .usage-info h3 { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; }
+  .usage-info p { font-size: 0.85rem; color: var(--muted); }
+  .usage-meter { width: 200px; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .usage-meter-fill { height: 100%; background: var(--jade); border-radius: 3px; transition: width 0.3s; }
+  .usage-meter-fill.danger { background: var(--amber); }
+  .usage-meter-fill.full { background: var(--error); }
+
+  /* URL input */
+  .url-section { margin-bottom: 2rem; }
+  .url-form {
+    display: flex; width: 100%; max-width: 700px; margin: 0 auto;
+    border: 1px solid var(--border-jade); border-radius: 12px; overflow: hidden;
+    background: var(--bg2); transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .url-form:focus-within { border-color: var(--jade); box-shadow: 0 0 0 3px rgba(0,229,160,0.1); }
+  .url-form input {
+    flex: 1; padding: 1rem 1.25rem; background: transparent; border: none;
+    color: var(--text); font-size: 0.95rem; outline: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .url-form input::placeholder { color: var(--muted); }
+  .url-form button {
+    padding: 0.75rem 1.5rem; background: var(--jade); color: var(--bg);
+    border: none; font-weight: 700; font-size: 0.9rem; cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif; transition: background 0.2s;
+    white-space: nowrap;
+  }
+  .url-form button:hover { background: var(--jade2); }
+  .url-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Results */
+  .results-section { display: none; }
+  .status-box {
+    display: none; align-items: center; gap: 1rem; padding: 1.5rem;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--bg2); margin-bottom: 1rem;
+  }
+  .status-spinner {
+    width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--jade);
+    border-radius: 50%; animation: spin 0.6s linear infinite; flex-shrink: 0;
+  }
+  .result-body { display: none; }
+  .result-error {
+    display: none; padding: 1rem; border: 1px solid rgba(255,84,112,0.3);
+    border-radius: 8px; background: rgba(255,84,112,0.1); color: var(--error);
+    font-size: 0.85rem; margin-bottom: 1rem;
+  }
+
+  /* Brand analysis */
+  .brand-section { margin-bottom: 2rem; }
+  .brand-section h2 { font-family: 'Syne', sans-serif; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; }
+  .brand-card {
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    background: var(--bg2);
+  }
+  .ba-field { display: flex; border-bottom: 1px solid var(--border); }
+  .ba-field:last-child { border-bottom: none; }
+  .ba-label { width: 140px; padding: 0.75rem 1rem; font-size: 0.8rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; flex-shrink: 0; }
+  .ba-value { flex: 1; padding: 0.75rem 1rem; font-size: 0.9rem; }
+
+  /* Products */
+  .products-section { margin-bottom: 2rem; }
+  .products-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+  .products-header h2 { font-family: 'Syne', sans-serif; font-size: 1.25rem; font-weight: 700; }
+  .products-header span { font-size: 0.85rem; color: var(--muted); }
+  .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+  .product-card {
+    border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem;
+    background: var(--bg2); transition: border-color 0.2s; cursor: pointer;
+    display: flex; flex-direction: column; gap: 0.5rem; position: relative;
+  }
+  .product-card:hover { border-color: var(--border-jade); }
+  .product-card.locked { cursor: default; opacity: 0.7; }
+  .product-image-wrap { width: 100%; aspect-ratio: 1/1; border-radius: 8px; overflow: hidden; background: var(--bg3); display: flex; align-items: center; justify-content: center; }
+  .product-image-fallback { font-size: 2.5rem; }
+  .product-card img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
+  .product-card img.loaded { opacity: 1; }
+  .product-verified {
+    position: absolute; top: 1.25rem; right: 1.25rem;
+    font-size: 0.65rem; padding: 0.2rem 0.5rem; border-radius: 4px;
+    background: rgba(0,229,160,0.15); color: var(--jade); border: 1px solid var(--border-jade);
+    font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.05em;
+  }
+  .product-name { font-weight: 600; font-size: 0.95rem; }
+  .product-supplier { font-size: 0.7rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: 0.05em; }
+  .product-supplier-link { font-size: 0.75rem; color: var(--jade); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; }
+  .product-supplier-link:hover { text-decoration: underline; }
+  .arrow { font-size: 0.7rem; }
+  .product-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+  .product-meta { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
+  .product-prices { font-size: 0.8rem; }
+  .product-prices strong { color: var(--text); }
+  .product-margin { font-size: 0.85rem; font-weight: 700; color: var(--jade); font-family: 'IBM Plex Mono', monospace; }
+
+  .lock-overlay {
+    position: absolute; inset: 0; border-radius: 12px;
+    background: rgba(6,8,13,0.85); backdrop-filter: blur(4px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;
+  }
+  .lock-icon { font-size: 1.5rem; }
+  .lock-text { font-size: 0.8rem; color: var(--muted); }
+  .lock-cta {
+    padding: 0.5rem 1.25rem; border: 1px solid var(--jade); border-radius: 8px;
+    background: var(--jade); color: var(--bg); font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  /* Action buttons */
+  .actions-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .action-btn {
+    padding: 0.6rem 1.2rem; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg2); color: var(--text); font-size: 0.85rem; font-weight: 500;
+    cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s;
+  }
+  .action-btn:hover { border-color: var(--border-jade); background: var(--bg3); }
+  .action-btn.primary { border-color: var(--jade); background: var(--jade); color: var(--bg); font-weight: 600; }
+  .action-btn.primary:hover { background: var(--jade2); }
+  .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Modal */
+  .modal {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+    align-items: center; justify-content: center; padding: 1rem;
+  }
+  .modal-content {
+    width: 100%; max-width: 680px; max-height: 90vh; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: 20px; background: var(--bg2); padding: 2rem;
+  }
+  .modal-close {
+    float: right; background: none; border: none; color: var(--muted);
+    font-size: 1.5rem; cursor: pointer; padding: 0.25rem; line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal h2 { font-family: 'Syne', sans-serif; font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .modal .emoji-lg { font-size: 3rem; margin-bottom: 0.5rem; }
+  .modal .chinese { font-size: 0.85rem; color: var(--jade); font-family: 'IBM Plex Mono', monospace; margin-bottom: 1rem; }
+  .modal .desc { color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem; }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem; }
+  .modal-stat { padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; }
+  .modal-stat-label { font-size: 0.7rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; }
+  .modal-stat-value { font-size: 1rem; font-weight: 600; margin-top: 0.25rem; }
+  .modal-links { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .pm-link {
+    display: block; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px;
+    text-decoration: none; color: var(--text); transition: border-color 0.2s;
+  }
+  .pm-link:hover { border-color: var(--border-jade); }
+  .pm-link-label { font-size: 0.85rem; font-weight: 500; }
+  .pm-link-note { display: block; font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem; }
+  .pm-deep-section { display: none; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+  .pm-deep-body { }
+  .pm-deep-block { margin-bottom: 1rem; }
+  .pm-deep-block h5 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; }
+  .pm-deep-loading { font-size: 0.85rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+  .pm-listings { display: flex; flex-direction: column; gap: 0.5rem; }
+  .pm-listing {
+    display: block; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;
+    text-decoration: none; color: var(--text); font-size: 0.85rem;
+  }
+  .pm-listing:hover { border-color: var(--border-jade); }
+  .pm-listing-head { display: flex; justify-content: space-between; margin-bottom: 0.25rem; }
+  .pm-listing-supplier { font-size: 0.7rem; font-family: 'IBM Plex Mono', monospace; color: var(--jade); }
+  .pm-listing-title { font-weight: 500; }
+  .pm-listing-snippet { font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem; }
+  .pm-listing-url { font-size: 0.7rem; color: var(--muted); word-break: break-all; margin-top: 0.15rem; }
+  .pm-alt { margin-bottom: 0.75rem; }
+  .pm-alt-name { font-weight: 500; font-size: 0.85rem; }
+  .pm-alt-why { font-size: 0.75rem; color: var(--muted); margin: 0.15rem 0; }
+  .pm-alt-links { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .pm-alt-link { font-size: 0.75rem; color: var(--jade); text-decoration: none; }
+  .pm-alt-link:hover { text-decoration: underline; }
+  .modal table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .modal table td { padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border); }
+  .modal table td:first-child { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; width: 40%; }
+  .modal ul { list-style: none; }
+  .modal ul li { padding: 0.35rem 0; font-size: 0.85rem; color: var(--muted); }
+  .modal ul li::before { content: '• '; color: var(--jade); }
+
+  .empty-state {
+    text-align: center; padding: 3rem 1rem; border: 1px dashed var(--border);
+    border-radius: 12px; color: var(--muted);
+  }
+  .empty-state .emoji-big { font-size: 3rem; margin-bottom: 1rem; }
+  .empty-state p { font-size: 0.9rem; max-width: 400px; margin: 0 auto; }
+
+  /* Premium gate */
+  .premium-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    background: rgba(0,0,0,0.8); backdrop-filter: blur(12px);
+    display: none; align-items: center; justify-content: center; padding: 1rem;
+  }
+  .premium-card {
+    max-width: 480px; width: 100%; border: 1px solid var(--border-jade);
+    border-radius: 20px; background: var(--bg2); padding: 2.5rem; text-align: center;
+  }
+  .premium-card h2 { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; }
+  .premium-card p { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+  .premium-card .price-large { font-family: 'Syne', sans-serif; font-size: 3rem; font-weight: 800; color: var(--jade); margin-bottom: 0.25rem; }
+  .premium-card .price-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 768px) {
+    nav { padding: 0.75rem 1rem; }
+    .dashboard { padding: 1rem; }
+    .usage-bar { flex-direction: column; align-items: stretch; }
+    .usage-meter { width: 100%; }
+    .product-grid { grid-template-columns: 1fr; }
+    .modal-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Open<span>Store</span>.ai</a>
+  <div class="nav-right">
+    <span class="nav-user" id="navUser"></span>
+    <span class="nav-tier" id="navTier">Free</span>
+    <button class="action-btn" onclick="logout()" style="font-size:0.8rem;padding:0.4rem 0.8rem;">Sign Out</button>
+  </div>
+</nav>
+
+<div class="dashboard" id="app">
+  <!-- Usage bar -->
+  <div class="usage-bar" id="usageBar">
+    <div class="usage-info">
+      <h3 id="usageTitle">Free Plan</h3>
+      <p id="usageText">0 of 3 analyses used this month</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <div class="usage-meter"><div class="usage-meter-fill" id="usageFill" style="width:0%"></div></div>
+      <button class="action-btn primary" id="upgradeBtn" style="display:none;" onclick="openPremium()">Upgrade →</button>
+    </div>
+  </div>
+
+  <!-- URL input -->
+  <div class="url-section">
+    <form class="url-form" id="urlForm">
+      <input type="url" id="urlInput" placeholder="Enter a brand/store URL, e.g. https://www.supremenewyork.com" required />
+      <button type="submit" id="analyzeBtn">Analyze & Source →</button>
+    </form>
+  </div>
+
+  <!-- Results -->
+  <div class="results-section" id="results">
+    <div class="status-box" id="statusBox">
+      <div class="status-spinner"></div>
+      <span id="statusText">Working...</span>
+    </div>
+    <div class="result-error" id="resultError"></div>
+    <div class="result-body" id="resultBody">
+      <!-- Brand -->
+      <div class="brand-section">
+        <h2 id="brandHeading">Brand Analysis</h2>
+        <div class="brand-card" id="brandCard"></div>
+      </div>
+      <!-- Products -->
+      <div class="products-section">
+        <div class="products-header">
+          <h2>Sourced Products</h2>
+          <span id="productCount"></span>
+        </div>
+        <div class="product-grid" id="productGrid"></div>
+        <div class="actions-bar" id="actionsBar">
+          <button class="action-btn" id="addToSiteBtn">🔌 Add to Site</button>
+          <button class="action-btn" id="exportBtn">📥 Export to Excel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="empty-state" id="emptyState">
+    <div class="emoji-big">🔍</div>
+    <p>Enter a brand URL above to analyze their product catalog and find matching wholesale suppliers. Results appear here.</p>
+  </div>
+</div>
+
+<!-- Product Modal -->
+<div class="modal" id="productModal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeProductModal()">×</button>
+    <div class="emoji-lg" id="pmEmoji"></div>
+    <h2 id="pmName"></h2>
+    <div class="chinese" id="pmChinese"></div>
+    <div class="desc" id="pmDesc"></div>
+    <div class="modal-grid">
+      <div class="modal-stat"><div class="modal-stat-label">Cost Price</div><div class="modal-stat-value" id="pmCost"></div></div>
+      <div class="modal-stat"><div class="modal-stat-label">Sell Price</div><div class="modal-stat-value" id="pmSell"></div></div>
+      <div class="modal-stat"><div class="modal-stat-label">Margin</div><div class="modal-stat-value" id="pmMargin" style="color:var(--jade);"></div></div>
+      <div class="modal-stat"><div class="modal-stat-label">MOQ</div><div class="modal-stat-value" id="pmMoq"></div></div>
+      <div class="modal-stat"><div class="modal-stat-label">Lead Time</div><div class="modal-stat-value" id="pmLead"></div></div>
+      <div class="modal-stat"><div class="modal-stat-label">Supplier</div><div class="modal-stat-value" id="pmSupplier"></div></div>
+    </div>
+    <div class="modal-links" id="pmLinks"></div>
+    <button class="action-btn primary" id="pmDeepBtn" onclick="runDeepSearch()">✦ Run Deep Search</button>
+    <div class="pm-deep-section" id="pmDeepSection">
+      <div class="pm-deep-body" id="pmDeepBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Premium upgrade modal -->
+<div class="premium-overlay" id="premiumOverlay">
+  <div class="premium-card">
+    <h2>Upgrade to Pro</h2>
+    <div class="price-large">$15</div>
+    <div class="price-sub">per month · cancel anytime</div>
+    <p>Unlimited analyses, full product access, deep sourcing, Excel export, and embeddable widgets.</p>
+    <button class="action-btn primary" style="width:100%;padding:0.75rem;font-size:1rem;" onclick="startCheckout()">Subscribe Now →</button>
+    <br/><br/>
+    <button class="action-btn" onclick="closePremium()" style="width:100%;">Maybe later</button>
+  </div>
+</div>
+
+<!-- Embed modal -->
+<div class="modal" id="embedModal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeEmbedModal()">×</button>
+    <h2>🔌 Add to Your Site</h2>
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;">Copy this script tag and paste it anywhere on your website to display sourced products.</p>
+    <pre id="embedCode" style="background:var(--bg);padding:1rem;border-radius:8px;font-size:0.8rem;overflow-x:auto;border:1px solid var(--border);margin-bottom:1rem;"></pre>
+    <button class="action-btn primary" onclick="copyEmbed()">📋 Copy to Clipboard</button>
+    <span style="font-size:0.8rem;color:var(--jade);margin-left:1rem;" id="copyHint"></span>
+  </div>
+</div>
+
+<script>
+// ─── Auth ──────────────────────────────────────────────────────────
+let TOKEN = null;
+let USER = null;
+let currentSessionId = null;
+let currentProducts = [];
+let openProductIndex = -1;
+const FREE_LIMIT = 5;
+
+function getToken() {
+  return localStorage.getItem('os_token');
+}
+
+function getUser() {
+  try { return JSON.parse(localStorage.getItem('os_user')); } catch { return null; }
+}
+
+function authHeaders() {
+  const t = getToken();
+  return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+
+async function checkAuth() {
+  TOKEN = getToken();
+  USER = getUser();
+  if (!TOKEN || !USER) {
+    window.location.href = '/login';
+    return;
+  }
+  document.getElementById('navUser').textContent = USER.email;
+  document.getElementById('navTier').textContent = USER.tier === 'paid' ? 'Pro' : 'Free';
+  if (USER.tier !== 'paid') {
+    document.getElementById('navTier').classList.add('free');
+  }
+  // Load usage
+  try {
+    const res = await fetch('/api/usage', { headers: authHeaders() });
+    const data = await res.json();
+    if (res.ok) {
+      updateUsage(data);
+    }
+  } catch {}
+}
+
+function updateUsage(data) {
+  const used = data.uses_this_month || 0;
+  const limit = data.limit || 3;
+  const pct = Math.min(100, (used / limit) * 100);
+  document.getElementById('usageText').textContent = `${used} of ${limit} analyses used this month`;
+  document.getElementById('usageFill').style.width = pct + '%';
+  document.getElementById('usageFill').className = 'usage-meter-fill' + (pct >= 100 ? ' full' : pct >= 80 ? ' danger' : '');
+
+  if (data.tier === 'paid') {
+    document.getElementById('usageTitle').textContent = 'Pro Plan';
+    document.getElementById('usageText').textContent = 'Unlimited analyses';
+    document.getElementById('usageFill').style.width = '0%';
+    document.getElementById('upgradeBtn').style.display = 'none';
+  } else {
+    document.getElementById('usageTitle').textContent = 'Free Plan';
+    document.getElementById('upgradeBtn').style.display = used >= limit ? 'block' : 'none';
+  }
+}
+
+function logout() {
+  localStorage.removeItem('os_token');
+  localStorage.removeItem('os_user');
+  window.location.href = '/';
+}
+
+// ─── Premium ───────────────────────────────────────────────────────
+function openPremium() { document.getElementById('premiumOverlay').style.display = 'flex'; }
+function closePremium() { document.getElementById('premiumOverlay').style.display = 'none'; }
+
+async function startCheckout() {
+  try {
+    const res = await fetch('/api/billing/create-checkout', {
+      method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    });
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
+    else throw new Error(data.error);
+  } catch (err) {
+    alert('Billing not configured yet. In production, this redirects to Stripe checkout.');
+    closePremium();
+  }
+}
+
+// ─── Core Flow ─────────────────────────────────────────────────────
+const urlForm = document.getElementById('urlForm');
+const urlInput = document.getElementById('urlInput');
+const analyzeBtn = document.getElementById('analyzeBtn');
+
+urlForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const raw = urlInput.value.trim();
+  if (!raw) return;
+  await runFlow(raw);
+});
+
+async function runFlow(raw) {
+  setBusy(true);
+  showStatus('Analyzing your site...');
+  showResults();
+  hideError();
+
+  try {
+    const a = await fetchJson('/api/analyze', {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: raw }),
+    });
+
+    currentSessionId = a.sessionId;
+    renderBrand(a.analysis);
+
+    showStatus('Sourcing products & verifying real supplier listings...');
+    const s = await fetchJson('/api/source', {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: currentSessionId, analysis: a.analysis }),
+    });
+
+    currentSessionId = s.sessionId || currentSessionId;
+    renderProducts(s.products);
+    hideStatus();
+    revealBody();
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Refresh usage
+    try {
+      const r = await fetch('/api/usage', { headers: authHeaders() });
+      if (r.ok) updateUsage(await r.json());
+    } catch {}
+  } catch (err) {
+    console.error(err);
+    hideStatus();
+    showError(err.message || 'Something went wrong.');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function fetchJson(url, options) {
+  const res = await fetch(url, options);
+  let data;
+  try { data = await res.json(); } catch { throw new Error(`Server returned non-JSON (status ${res.status})`); }
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+function setBusy(busy) {
+  analyzeBtn.disabled = busy;
+  analyzeBtn.textContent = busy ? 'Working...' : 'Analyze & Source →';
+  urlInput.disabled = busy;
+}
+
+function showResults() { document.getElementById('results').style.display = 'block'; document.getElementById('emptyState').style.display = 'none'; }
+function showStatus(msg) {
+  document.getElementById('statusBox').style.display = 'flex';
+  document.getElementById('resultBody').style.display = 'none';
+  document.getElementById('statusText').textContent = msg;
+}
+function hideStatus() { document.getElementById('statusBox').style.display = 'none'; }
+function revealBody() { document.getElementById('resultBody').style.display = 'block'; }
+function showError(msg) {
+  document.getElementById('resultError').style.display = 'block';
+  document.getElementById('resultError').textContent = '× ' + msg;
+}
+function hideError() {
+  document.getElementById('resultError').style.display = 'none';
+  document.getElementById('resultError').textContent = '';
+}
+
+// ─── Brand ─────────────────────────────────────────────────────────
+function renderBrand(a) {
+  document.getElementById('brandHeading').textContent = a.brandName || 'Brand Analysis';
+  const card = document.getElementById('brandCard');
+  card.innerHTML = '';
+  addField('Brand', a.brandName || '—');
+  addField('Niche', a.niche || '—');
+  addField('Product types', (Array.isArray(a.productTypes) ? a.productTypes.join(', ') : '—'));
+  addField('Price range', a.priceRange ? `$${a.priceRange.min} – $${a.priceRange.max}` : '—');
+  addField('Target audience', a.targetAudience || '—');
+  if (a.summary) addField('Summary', a.summary);
+}
+
+function addField(label, value) {
+  const w = document.createElement('div'); w.className = 'ba-field';
+  const l = document.createElement('div'); l.className = 'ba-label'; l.textContent = label;
+  const v = document.createElement('div'); v.className = 'ba-value'; v.textContent = value;
+  w.appendChild(l); w.appendChild(v);
+  document.getElementById('brandCard').appendChild(w);
+}
+
+// ─── Products ──────────────────────────────────────────────────────
+function renderProducts(products) {
+  currentProducts = products || [];
+  const grid = document.getElementById('productGrid');
+  grid.innerHTML = '';
+  const total = products.length;
+  const isSubscribed = USER && USER.tier === 'paid';
+  const lockedCount = isSubscribed ? 0 : Math.max(0, total - FREE_LIMIT);
+  document.getElementById('productCount').textContent = isSubscribed ? `${total} sourced products` : `${total} sourced products · ${Math.min(FREE_LIMIT, total)} free preview`;
+
+  // Show export only if paid
+  document.getElementById('exportBtn').style.display = isSubscribed ? '' : 'none';
+
+  products.forEach((p, i) => {
+    const locked = !isSubscribed && i >= FREE_LIMIT;
+    const card = document.createElement('div');
+    card.className = 'product-card' + (locked ? ' locked' : '');
+
+    const emoji = escHtml(p.emoji || '📦');
+    const verified = p.realListing && p.realListing.url;
+    const supplierLabel = verified ? p.realListing.supplier || p.supplier : p.supplier;
+
+    card.innerHTML = `
+      <div class="product-image-wrap">
+        <div class="product-image-fallback">${emoji}</div>
+        ${p.imageUrl ? '<img alt="' + escAttr(p.name) + '" loading="lazy" />' : ''}
+        ${verified ? '<div class="product-verified">✓ Verified</div>' : ''}
+      </div>
+      <div class="product-name">${escHtml(p.name)}</div>
+      <div class="product-supplier">${escHtml(supplierLabel)}</div>
+      <div class="product-desc">${escHtml(p.description || '')}</div>
+      <div class="product-meta">
+        <div class="product-prices">Cost <strong>$${fmt(p.costPrice)}</strong> · Sell <strong>$${fmt(p.sellPrice)}</strong></div>
+        <div class="product-margin">+${p.marginPercent}%</div>
+      </div>
+      ${locked ? lockOverlay(lockedCount) : ''}
+    `;
+
+    const img = card.querySelector('img');
+    if (img && p.imageUrl) {
+      img.addEventListener('load', () => img.classList.add('loaded'));
+      img.addEventListener('error', () => img.remove());
+      img.src = p.imageUrl;
+    }
+
+    if (!locked) {
+      card.title = 'Click to see all suppliers + deep search';
+      card.addEventListener('click', () => openProductModal(i));
+    }
+
+    grid.appendChild(card);
+  });
+
+  // Wire unlock buttons
+  grid.querySelectorAll('.lock-cta').forEach((btn) => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openPremium(); });
+  });
+}
+
+function lockOverlay(lockedCount) {
+  return `<div class="lock-overlay"><div class="lock-icon">🔒</div><div class="lock-text">${lockedCount} more locked</div><button class="lock-cta" type="button">Unlock all — $15/mo</button></div>`;
+}
+
+// ─── Product Modal ─────────────────────────────────────────────────
+function openProductModal(index) {
+  const p = currentProducts[index];
+  if (!p) return;
+  openProductIndex = index;
+
+  document.getElementById('pmEmoji').textContent = p.emoji || '📦';
+  document.getElementById('pmName').textContent = p.name || '';
+  document.getElementById('pmChinese').textContent = p.chineseName ? '中文 · ' + p.chineseName : '';
+  document.getElementById('pmDesc').textContent = p.description || '';
+  document.getElementById('pmCost').textContent = '$' + fmt(p.costPrice);
+  document.getElementById('pmSell').textContent = '$' + fmt(p.sellPrice);
+  document.getElementById('pmMargin').textContent = '+' + (p.marginPercent || 0) + '%';
+  document.getElementById('pmMoq').textContent = p.moqEstimate || '—';
+  document.getElementById('pmLead').textContent = p.leadTime || '—';
+  document.getElementById('pmSupplier').textContent = p.supplier || '—';
+
+  const links = document.getElementById('pmLinks');
+  links.innerHTML = '';
+  if (p.realListing && p.realListing.url) {
+    const a = document.createElement('a'); a.className = 'pm-link';
+    a.style.borderColor = 'var(--border-jade)'; a.style.background = 'rgba(0,229,160,0.06)';
+    a.href = p.realListing.url; a.target = '_blank'; a.rel = 'noopener';
+    a.innerHTML = '<span class="pm-link-label">✓ Verified listing on ' + escHtml(p.realListing.supplier || 'supplier') + ' <span class="arrow">→</span></span><span class="pm-link-note">' + escHtml((p.realListing.title || '').slice(0, 110)) + '</span>';
+    links.appendChild(a);
+  }
+  (p.links || []).forEach((l) => {
+    const a = document.createElement('a'); a.className = 'pm-link';
+    a.href = l.url; a.target = '_blank'; a.rel = 'noopener';
+    a.innerHTML = '<span class="pm-link-label">' + escHtml(l.label) + ' <span class="arrow">→</span></span><span class="pm-link-note">' + escHtml(l.note || '') + '</span>';
+    links.appendChild(a);
+  });
+
+  document.getElementById('pmDeepSection').style.display = 'none';
+  document.getElementById('pmDeepBody').innerHTML = '';
+  document.getElementById('pmDeepBtn').disabled = false;
+  document.getElementById('pmDeepBtn').textContent = '✦ Run deep search';
+
+  document.getElementById('productModal').style.display = 'flex';
+}
+
+function closeProductModal() {
+  document.getElementById('productModal').style.display = 'none';
+  openProductIndex = -1;
+}
+
+async function runDeepSearch() {
+  if (openProductIndex < 0 || !currentSessionId) return;
+  // Check paid
+  if (USER.tier !== 'paid') {
+    document.getElementById('pmDeepBtn').textContent = '✦ Upgrade to use';
+    setTimeout(() => { document.getElementById('pmDeepBtn').textContent = '✦ Upgrade to use'; }, 100);
+    openPremium();
+    return;
+  }
+
+  document.getElementById('pmDeepBtn').disabled = true;
+  document.getElementById('pmDeepBtn').textContent = 'Searching...';
+  document.getElementById('pmDeepSection').style.display = 'block';
+  document.getElementById('pmDeepBody').innerHTML = '<div class="pm-deep-loading"><span>// Agent is sourcing this product across Chinese supplier networks...</span></div>';
+
+  try {
+    const data = await fetchJson('/api/deep-search', {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: currentSessionId, productIndex: openProductIndex }),
+    });
+    renderDeepSearch(data);
+  } catch (err) {
+    document.getElementById('pmDeepBody').innerHTML = '<div class="pm-deep-block"><strong>Deep search failed:</strong> ' + escHtml(err.message || 'Unknown error') + '</div>';
+  } finally {
+    document.getElementById('pmDeepBtn').disabled = false;
+    document.getElementById('pmDeepBtn').textContent = '✦ Run again';
+  }
+}
+
+function renderDeepSearch(d) {
+  const blocks = [];
+  if (Array.isArray(d.realListings) && d.realListings.length) {
+    blocks.push('<div class="pm-deep-block"><h5>✦ Real product listings found</h5><div class="pm-listings">' +
+      d.realListings.map((l) => '<a class="pm-listing" href="' + escAttr(l.url) + '" target="_blank" rel="noopener"><div class="pm-listing-head"><span class="pm-listing-supplier">' + escHtml(l.supplier || 'web') + '</span><span class="pm-listing-arrow">→</span></div><div class="pm-listing-title">' + escHtml(l.title || l.url) + '</div>' + (l.snippet ? '<div class="pm-listing-snippet">' + escHtml(l.snippet) + '</div>' : '') + '<div class="pm-listing-url">' + escHtml(l.url) + '</div></a>').join('') +
+    '</div></div>');
+  }
+  if (Array.isArray(d.refinedSearches) && d.refinedSearches.length) {
+    blocks.push('<div class="pm-deep-block"><h5>Refined search queries</h5>' +
+      d.refinedSearches.map((rs, idx) => '<div class="pm-alt"><div class="pm-alt-name">' + escHtml(rs.query) + (d.refinedQueriesZh && d.refinedQueriesZh[idx] ? ' <span style="color:var(--jade);font-family:\'IBM Plex Mono\',monospace;font-size:0.85em;">· ' + escHtml(d.refinedQueriesZh[idx]) + '</span>' : '') + '</div><div class="pm-alt-links">' + rs.links.map((l) => '<a class="pm-alt-link" href="' + escAttr(l.url) + '" target="_blank" rel="noopener">' + escHtml(l.label) + ' →</a>').join('') + '</div></div>').join('') +
+    '</div>');
+  }
+  const specRows = (d.specifications || []).map((s) => '<tr><td>' + escHtml(s.spec || '') + '</td><td>' + escHtml(s.typical || '') + '</td></tr>').join('');
+  if (specRows) blocks.push('<div class="pm-deep-block"><h5>Specs to request from suppliers</h5><table>' + specRows + '</table></div>');
+  if (Array.isArray(d.alternatives) && d.alternatives.length) {
+    blocks.push('<div class="pm-deep-block"><h5>Alternative product variants</h5>' +
+      d.alternatives.map((alt) => { const en = encodeURIComponent(alt.searchEn || alt.name || ''); const zh = encodeURIComponent(alt.searchZh || alt.searchEn || alt.name || ''); return '<div class="pm-alt"><div class="pm-alt-name">' + escHtml(alt.name || '') + '</div><div class="pm-alt-why">' + escHtml(alt.why || '') + '</div><div class="pm-alt-links"><a class="pm-alt-link" href="https://www.alibaba.com/trade/search?SearchText=' + en + '" target="_blank">Alibaba →</a><a class="pm-alt-link" href="https://s.1688.com/selloffer/offer_search.htm?keywords=' + zh + '" target="_blank">1688 →</a><a class="pm-alt-link" href="https://www.aliexpress.com/wholesale?SearchText=' + en + '" target="_blank">AliExpress →</a></div></div>'; }).join('') +
+    '</div>');
+  }
+  const srcRows = []; if (d.moqRange) srcRows.push('<tr><td>MOQ range</td><td>' + escHtml(d.moqRange) + '</td></tr>'); if (d.leadTimeRange) srcRows.push('<tr><td>Lead time</td><td>' + escHtml(d.leadTimeRange) + '</td></tr>'); if (d.samplePolicy) srcRows.push('<tr><td>Sample policy</td><td>' + escHtml(d.samplePolicy) + '</td></tr>');
+  if (srcRows.length) blocks.push('<div class="pm-deep-block"><h5>Sourcing terms</h5><table>' + srcRows.join('') + '</table></div>');
+  if (Array.isArray(d.supplierTips) && d.supplierTips.length) blocks.push('<div class="pm-deep-block"><h5>Supplier vetting tips</h5><ul>' + d.supplierTips.map((t) => '<li>' + escHtml(t) + '</li>').join('') + '</ul></div>');
+  if (Array.isArray(d.qualityRisks) && d.qualityRisks.length) blocks.push('<div class="pm-deep-block"><h5>Common quality risks</h5><ul>' + d.qualityRisks.map((t) => '<li>' + escHtml(t) + '</li>').join('') + '</ul></div>');
+  document.getElementById('pmDeepBody').innerHTML = blocks.join('') || '<div class="pm-deep-block">No additional sourcing data returned.</div>';
+}
+
+// ─── Actions ───────────────────────────────────────────────────────
+document.getElementById('addToSiteBtn').addEventListener('click', () => {
+  if (USER.tier !== 'paid') { openPremium(); return; }
+  const sid = currentSessionId || 'your-session-id';
+  const origin = window.location.origin;
+  document.getElementById('embedCode').textContent =
+    '<script src="' + origin + '/widget.js"\n        data-session="' + sid + '"\n        data-theme="auto"\n        async><\/script>';
+  document.getElementById('embedModal').style.display = 'flex';
+  document.getElementById('copyHint').textContent = '';
+});
+
+function closeEmbedModal() { document.getElementById('embedModal').style.display = 'none'; }
+
+async function copyEmbed() {
+  try {
+    await navigator.clipboard.writeText(document.getElementById('embedCode').textContent);
+    document.getElementById('copyHint').textContent = '✓ Copied to clipboard';
+  } catch {
+    document.getElementById('copyHint').textContent = 'Press Ctrl/Cmd+C to copy';
+  }
+}
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (!currentSessionId) return;
+  if (USER.tier !== 'paid') { openPremium(); return; }
+  window.location.href = '/api/export/' + currentSessionId;
+});
+
+// ─── Utilities ─────────────────────────────────────────────────────
+function fmt(n) { const v = Number(n); if (!isFinite(v)) return '0'; return v % 1 === 0 ? v.toFixed(0) : v.toFixed(2); }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+function escAttr(s) { return escHtml(s); }
+
+// ─── Init ──────────────────────────────────────────────────────────
+checkAuth();
+
+// Modal close handlers
+document.querySelectorAll('.modal').forEach((m) => {
+  m.addEventListener('click', (e) => { if (e.target === m) m.style.display = 'none'; });
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal').forEach((m) => m.style.display = 'none');
+    document.getElementById('premiumOverlay').style.display = 'none';
+  }
+});
+</script>
+</body>
+</html>

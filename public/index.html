@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OpenStore.ai — AI-Powered Product Sourcing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #06080D; --bg2: #0C1018; --bg3: #121820;
+    --jade: #00E5A0; --jade2: #00C285; --amber: #FFB547;
+    --text: #F0F4FF; --muted: #8892A4; --error: #FF5470;
+    --border: rgba(255,255,255,0.07); --border-jade: rgba(0,229,160,0.25);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 16px; line-height: 1.6; overflow-x: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0; opacity: 0.4;
+  }
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+    background-size: 60px 60px; pointer-events: none; z-index: 0;
+  }
+  * { position: relative; z-index: 1; }
+
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.25rem 4rem; border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px); background: rgba(6,8,13,0.8);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-family: 'Syne', sans-serif; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
+  .logo span { color: var(--jade); }
+  .nav-links { display: flex; gap: 2.5rem; list-style: none; }
+  .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--text); }
+  .nav-cta { display: flex; gap: 1rem; align-items: center; }
+
+  .btn-ghost {
+    padding: 0.55rem 1.2rem; border: 1px solid var(--border); border-radius: 8px;
+    color: var(--muted); text-decoration: none; font-size: 0.875rem; font-weight: 500;
+    transition: all 0.2s; background: transparent; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.2); color: var(--text); background: rgba(255,255,255,0.04); }
+  .btn-primary {
+    padding: 0.55rem 1.4rem; border: 1px solid var(--jade); border-radius: 8px;
+    color: var(--bg); background: var(--jade); font-size: 0.875rem; font-weight: 600;
+    text-decoration: none; cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .btn-primary:hover { background: var(--jade2); border-color: var(--jade2); }
+
+  .hero {
+    min-height: 92vh; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; padding: 6rem 2rem 4rem; max-width: 900px; margin: 0 auto;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 1rem; border: 1px solid var(--border-jade); border-radius: 999px;
+    font-size: 0.8rem; color: var(--jade); font-family: 'IBM Plex Mono', monospace;
+    margin-bottom: 2.5rem; background: rgba(0,229,160,0.05);
+  }
+  .hero-badge::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--jade); animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .hero h1 {
+    font-family: 'Syne', sans-serif; font-size: clamp(3rem, 6vw, 5.5rem);
+    font-weight: 800; line-height: 1.05; letter-spacing: -0.03em; margin-bottom: 1.5rem;
+  }
+  .hero h1 em { font-style: normal; color: var(--jade); position: relative; }
+  .hero h1 em::after {
+    content: ''; position: absolute; bottom: 4px; left: 0; right: 0;
+    height: 3px; background: var(--jade); opacity: 0.3; border-radius: 2px;
+  }
+  .hero p { font-size: 1.15rem; color: var(--muted); max-width: 580px; margin: 0 auto 3rem; line-height: 1.7; }
+
+  .url-form {
+    display: flex; width: 100%; max-width: 680px; margin: 0 auto 1rem;
+    border: 1px solid var(--border-jade); border-radius: 12px; overflow: hidden;
+    background: var(--bg2); transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .url-form:focus-within { border-color: var(--jade); box-shadow: 0 0 0 3px rgba(0,229,160,0.1); }
+  .url-form input {
+    flex: 1; padding: 1rem 1.25rem; background: transparent; border: none;
+    color: var(--text); font-size: 0.95rem; outline: none; font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .url-form input::placeholder { color: var(--muted); }
+  .url-form button {
+    padding: 0.75rem 1.5rem; background: var(--jade); color: var(--bg);
+    border: none; font-weight: 700; font-size: 0.9rem; cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif; transition: background 0.2s; white-space: nowrap;
+  }
+  .url-form button:hover { background: var(--jade2); }
+  .url-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .hero-note { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
+  .hero-note span { color: var(--jade); font-family: 'IBM Plex Mono', monospace; }
+
+  .results-section { display: none; max-width: 1100px; margin: 0 auto; padding: 0 2rem 4rem; }
+  .results-section:target { display: block; }
+
+  .status-box {
+    display: none; align-items: center; gap: 1rem; padding: 1.5rem;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--bg2); margin-bottom: 1rem;
+  }
+  .status-spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--jade); border-radius: 50%; animation: spin 0.6s linear infinite; flex-shrink: 0; }
+  .result-body { display: none; }
+  .result-error {
+    display: none; padding: 1rem; border: 1px solid rgba(255,84,112,0.3); border-radius: 8px;
+    background: rgba(255,84,112,0.1); color: var(--error); font-size: 0.85rem; margin-bottom: 1rem;
+  }
+
+  .brand-section { margin-bottom: 2rem; }
+  .brand-section h2 { font-family: 'Syne', sans-serif; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; }
+  .brand-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg2); }
+  .ba-field { display: flex; border-bottom: 1px solid var(--border); }
+  .ba-field:last-child { border-bottom: none; }
+  .ba-label { width: 140px; padding: 0.75rem 1rem; font-size: 0.8rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; flex-shrink: 0; }
+  .ba-value { flex: 1; padding: 0.75rem 1rem; font-size: 0.9rem; }
+
+  .products-section { margin-bottom: 2rem; }
+  .products-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+  .products-header h2 { font-family: 'Syne', sans-serif; font-size: 1.25rem; font-weight: 700; }
+  .products-header span { font-size: 0.85rem; color: var(--muted); }
+  .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+  .product-card {
+    border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem;
+    background: var(--bg2); transition: border-color 0.2s; cursor: pointer;
+    display: flex; flex-direction: column; gap: 0.5rem; position: relative;
+  }
+  .product-card:hover { border-color: var(--border-jade); }
+  .product-card.locked { cursor: default; opacity: 0.7; }
+  .product-image-wrap { width: 100%; aspect-ratio: 1/1; border-radius: 8px; overflow: hidden; background: var(--bg3); display: flex; align-items: center; justify-content: center; }
+  .product-image-fallback { font-size: 2.5rem; }
+  .product-card img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
+  .product-card img.loaded { opacity: 1; }
+  .product-verified {
+    position: absolute; top: 1.25rem; right: 1.25rem;
+    font-size: 0.65rem; padding: 0.2rem 0.5rem; border-radius: 4px;
+    background: rgba(0,229,160,0.15); color: var(--jade); border: 1px solid var(--border-jade);
+    font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.05em;
+  }
+  .product-name { font-weight: 600; font-size: 0.95rem; }
+  .product-supplier { font-size: 0.7rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: 0.05em; }
+  .product-supplier-link { font-size: 0.75rem; color: var(--jade); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; }
+  .product-supplier-link:hover { text-decoration: underline; }
+  .product-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+  .product-meta { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
+  .product-prices { font-size: 0.8rem; }
+  .product-prices strong { color: var(--text); }
+  .product-margin { font-size: 0.85rem; font-weight: 700; color: var(--jade); font-family: 'IBM Plex Mono', monospace; }
+
+  .lock-overlay {
+    position: absolute; inset: 0; border-radius: 12px;
+    background: rgba(6,8,13,0.85); backdrop-filter: blur(4px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;
+  }
+  .lock-icon { font-size: 1.5rem; }
+  .lock-text { font-size: 0.8rem; color: var(--muted); }
+  .lock-cta {
+    padding: 0.5rem 1.25rem; border: 1px solid var(--jade); border-radius: 8px;
+    background: var(--jade); color: var(--bg); font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  .actions-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .action-btn {
+    padding: 0.6rem 1.2rem; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg2); color: var(--text); font-size: 0.85rem; font-weight: 500;
+    cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s;
+  }
+  .action-btn:hover { border-color: var(--border-jade); background: var(--bg3); }
+  .action-btn.primary { border-color: var(--jade); background: var(--jade); color: var(--bg); font-weight: 600; }
+  .action-btn.primary:hover { background: var(--jade2); }
+  .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .modal {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+    align-items: center; justify-content: center; padding: 1rem;
+  }
+  .modal-content {
+    width: 100%; max-width: 680px; max-height: 90vh; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: 20px; background: var(--bg2); padding: 2rem;
+  }
+  .modal-close { float: right; background: none; border: none; color: var(--muted); font-size: 1.5rem; cursor: pointer; padding: 0.25rem; line-height: 1; }
+  .modal-close:hover { color: var(--text); }
+  .modal h2 { font-family: 'Syne', sans-serif; font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .modal .emoji-lg { font-size: 3rem; margin-bottom: 0.5rem; }
+  .modal .chinese { font-size: 0.85rem; color: var(--jade); font-family: 'IBM Plex Mono', monospace; margin-bottom: 1rem; }
+  .modal .desc { color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem; }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem; }
+  .modal-stat { padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; }
+  .modal-stat-label { font-size: 0.7rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; }
+  .modal-stat-value { font-size: 1rem; font-weight: 600; margin-top: 0.25rem; }
+  .modal-links { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .pm-link { display: block; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; text-decoration: none; color: var(--text); transition: border-color 0.2s; }
+  .pm-link:hover { border-color: var(--border-jade); }
+  .pm-link-label { font-size: 0.85rem; font-weight: 500; }
+  .pm-link-note { display: block; font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem; }
+  .pm-deep-section { display: none; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+  .pm-deep-loading { font-size: 0.85rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+  .pm-listings { display: flex; flex-direction: column; gap: 0.5rem; }
+  .pm-listing { display: block; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; text-decoration: none; color: var(--text); font-size: 0.85rem; }
+  .pm-listing:hover { border-color: var(--border-jade); }
+  .pm-listing-head { display: flex; justify-content: space-between; margin-bottom: 0.25rem; }
+  .pm-listing-supplier { font-size: 0.7rem; font-family: 'IBM Plex Mono', monospace; color: var(--jade); }
+  .pm-listing-title { font-weight: 500; }
+  .pm-listing-url { font-size: 0.7rem; color: var(--muted); word-break: break-all; margin-top: 0.15rem; }
+  .pm-alt { margin-bottom: 0.75rem; }
+  .pm-alt-name { font-weight: 500; font-size: 0.85rem; }
+  .pm-alt-why { font-size: 0.75rem; color: var(--muted); margin: 0.15rem 0; }
+  .pm-alt-links { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .pm-alt-link { font-size: 0.75rem; color: var(--jade); text-decoration: none; }
+  .pm-alt-link:hover { text-decoration: underline; }
+  .modal table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .modal table td { padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border); }
+  .modal table td:first-child { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; width: 40%; }
+  .modal ul { list-style: none; }
+  .modal ul li { padding: 0.35rem 0; font-size: 0.85rem; color: var(--muted); }
+  .modal ul li::before { content: '• '; color: var(--jade); }
+
+  .premium-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    background: rgba(0,0,0,0.8); backdrop-filter: blur(12px);
+    display: none; align-items: center; justify-content: center; padding: 1rem;
+  }
+  .premium-card { max-width: 480px; width: 100%; border: 1px solid var(--border-jade); border-radius: 20px; background: var(--bg2); padding: 2.5rem; text-align: center; }
+  .premium-card h2 { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; }
+  .premium-card p { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+  .premium-card .price-large { font-family: 'Syne', sans-serif; font-size: 3rem; font-weight: 800; color: var(--jade); margin-bottom: 0.25rem; }
+  .premium-card .price-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+
+  .features { padding: 6rem 4rem; max-width: 1100px; margin: 0 auto; }
+  .features h2 { font-family: 'Syne', sans-serif; font-size: clamp(2rem, 3.5vw, 3rem); font-weight: 800; letter-spacing: -0.025em; margin-bottom: 3rem; text-align: center; }
+  .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+  .feature-card { border: 1px solid var(--border); border-radius: 16px; padding: 2rem; background: var(--bg2); transition: border-color 0.3s; }
+  .feature-card:hover { border-color: var(--border-jade); }
+  .feature-icon { width: 44px; height: 44px; border-radius: 10px; background: rgba(0,229,160,0.08); border: 1px solid var(--border-jade); display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem; font-size: 1.2rem; }
+  .feature-card h3 { font-family: 'Syne', sans-serif; font-size: 1.05rem; font-weight: 700; margin-bottom: 0.6rem; }
+  .feature-card p { font-size: 0.875rem; color: var(--muted); line-height: 1.6; }
+
+  .account-wall {
+    background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    padding: 4rem 2rem; text-align: center;
+  }
+  .account-wall h2 { font-family: 'Syne', sans-serif; font-size: 1.75rem; font-weight: 700; margin-bottom: 1rem; }
+  .account-wall p { color: var(--muted); font-size: 0.95rem; max-width: 500px; margin: 0 auto 2rem; }
+
+  footer { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.8rem; border-top: 1px solid var(--border); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 768px) {
+    nav { padding: 1rem 1.5rem; flex-wrap: wrap; gap: 1rem; }
+    .nav-links { display: none; }
+    .feature-grid { grid-template-columns: 1fr; }
+    .features { padding: 3rem 1.5rem; }
+    .results-section { padding: 0 1rem 2rem; }
+    .product-grid { grid-template-columns: 1fr; }
+    .modal-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Open<span>Store</span>.ai</a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+  </ul>
+  <div class="nav-cta" id="navCta">
+    <a href="/login" class="btn-ghost">Sign In</a>
+    <a href="/login?signup=1" class="btn-primary">Get Started</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-badge">AI-powered product sourcing</div>
+  <h1>Source products from China with <em>AI</em></h1>
+  <p>Enter any brand or store URL. OpenStore.ai analyzes their product line, finds matching wholesale suppliers on Alibaba, 1688, and more — with real listings, pricing, and margins.</p>
+  <form class="url-form" id="urlForm">
+    <input type="url" id="urlInput" placeholder="Enter a brand URL — e.g. https://www.supremenewyork.com" required />
+    <button type="submit" id="analyzeBtn">Analyze & Source →</button>
+  </form>
+  <div class="hero-note">No credit card · Try it now · <span>Create an account</span> for unlimited use</div>
+</section>
+
+<section class="results-section" id="results">
+  <div class="status-box" id="statusBox">
+    <div class="status-spinner"></div>
+    <span id="statusText">Working...</span>
+  </div>
+  <div class="result-error" id="resultError"></div>
+  <div class="result-body" id="resultBody">
+    <div class="brand-section">
+      <h2 id="brandHeading">Brand Analysis</h2>
+      <div class="brand-card" id="brandCard"></div>
+    </div>
+    <div class="products-section">
+      <div class="products-header">
+        <h2>Sourced Products</h2>
+        <span id="productCount"></span>
+      </div>
+      <div class="product-grid" id="productGrid"></div>
+      <div class="actions-bar" id="actionsBar">
+        <button class="action-btn" id="tryAnotherBtn">🔄 Try Another Brand →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="features" id="features">
+  <h2>How it works</h2>
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🔍</div>
+      <h3>Analyze Any Brand</h3>
+      <p>Paste a store URL. Our AI scrapes and analyzes their product catalog, pricing, niche, and target audience.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔗</div>
+      <h3>Find Real Suppliers</h3>
+      <p>Automatically searches Alibaba, 1688, AliExpress, and more for verified wholesale listings matching each product.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💰</div>
+      <h3>See Margins Instantly</h3>
+      <p>Cost price, sell price, and margin calculated for every product. Links directly to supplier pages.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔬</div>
+      <h3>Deep Sourcing</h3>
+      <p>Drill into any product for refined search queries, alternative variants, supplier vetting tips, and quality risks.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>Export to Excel</h3>
+      <p>Export full product lists with supplier links to Excel. Perfect for sharing with your team or manufacturer.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🌐</div>
+      <h3>Embeddable Widget</h3>
+      <p>Add sourced products to any website with a single script tag. Great for dropshipping storefronts.</p>
+    </div>
+  </div>
+</section>
+
+<div class="account-wall" id="accountWall" style="display:none;">
+  <h2>✨ Want to analyze another brand?</h2>
+  <p>Create a free account to unlock unlimited analyses, full product access, deep sourcing, and more.</p>
+  <a href="/login?signup=1" class="btn-primary" style="padding:0.85rem 2rem;font-size:1rem;">Create Free Account →</a>
+  <br/><br/>
+  <a href="/login" style="color:var(--muted);font-size:0.85rem;">I already have an account</a>
+</div>
+
+<section class="features" id="pricing" style="padding-top:0;">
+  <h2>Simple pricing</h2>
+  <div class="feature-grid" style="max-width:700px;margin:0 auto;">
+    <div class="feature-card" style="text-align:center;">
+      <div style="font-size:2rem;margin-bottom:0.5rem;">🎁</div>
+      <h3>Free Trial</h3>
+      <div style="font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;margin-bottom:0.5rem;">$0</div>
+      <p>One free brand analysis to try it out. No credit card needed.</p>
+    </div>
+    <div class="feature-card" style="border-color:var(--border-jade);text-align:center;">
+      <div style="font-size:2rem;margin-bottom:0.5rem;">🚀</div>
+      <h3>Pro</h3>
+      <div style="font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;margin-bottom:0.5rem;">$15<span style="font-size:0.9rem;color:var(--muted);font-weight:400;">/mo</span></div>
+      <p>Unlimited analyses, deep sourcing, Excel export, and embeddable widgets.</p>
+      <a href="/login?signup=1" class="btn-primary" style="display:inline-block;margin-top:1rem;">Get Started</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>OpenStore.ai — AI-powered product sourcing. Not affiliated with Alibaba Group or any listed supplier.</p>
+</footer>
+
+<!-- Product Modal -->
+<div class="modal" id="productModal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeProductModal()">×</button>
+    <div class="emoji-lg" id="pmEmoji"></div>
+    <h2 id="pmName"></h2>
+    <div class="chinese" id="pmChinese"></div>
+    <div class="desc" id="pmDesc"></div>
+    <div class="modal-grid">
+      <div class="modal-stat"><div class="modal-stat-label">Cost Price</div><div class="modal-stat-value" id="pmCost"></div></div>
+      <div class="modal-stat"><div class="modal-stat-label">Sell Price</div><div class="modal-stat-value" id="pmSell"></div></div>
+      <div class="modal-stat"><div class="modal-stat-label">Margin</div><div class="modal-stat-value" id="pmMargin" style="color:var(--jade);"></div></div>
+      <div class="modal-stat"><div class="modal-stat-label">MOQ</div><div class="modal-stat-value" id="pmMoq"></div></div>
+      <div class="modal-stat"><div class="modal-stat-label">Lead Time</div><div class="modal-stat-value" id="pmLead"></div></div>
+      <div class="modal-stat"><div class="modal-stat-label">Supplier</div><div class="modal-stat-value" id="pmSupplier"></div></div>
+    </div>
+    <div class="modal-links" id="pmLinks"></div>
+  </div>
+</div>
+
+<!-- Signup prompt modal -->
+<div class="premium-overlay" id="signupPrompt">
+  <div class="premium-card">
+    <div style="font-size:3rem;margin-bottom:1rem;">🔓</div>
+    <h2>One free analysis used!</h2>
+    <p>Create a free account to analyze unlimited brands with full product access, deep sourcing, and more.</p>
+    <a href="/login?signup=1" class="btn-primary" style="display:block;text-align:center;padding:0.75rem;font-size:1rem;">Create Free Account →</a>
+    <br/>
+    <a href="/login" style="color:var(--muted);font-size:0.85rem;">Sign in if you already have an account</a>
+  </div>
+</div>
+
+<script>
+// ─── Track first-use ───────────────────────────────────────────────
+const FIRST_USE_KEY = 'os_tried';
+function hasUsedOnce() { return localStorage.getItem(FIRST_USE_KEY) === 'true'; }
+function markUsed() { localStorage.setItem(FIRST_USE_KEY, 'true'); }
+
+// ─── Check if logged in ────────────────────────────────────────────
+const TOKEN = localStorage.getItem('os_token');
+if (TOKEN) {
+  document.getElementById('navCta').innerHTML = '<a href="/dashboard" class="btn-primary">Dashboard</a>';
+}
+
+// ─── Core App ──────────────────────────────────────────────────────
+const urlForm = document.getElementById('urlForm');
+const urlInput = document.getElementById('urlInput');
+const analyzeBtn = document.getElementById('analyzeBtn');
+let currentSessionId = null;
+let currentProducts = [];
+
+urlForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const raw = urlInput.value.trim();
+  if (!raw) return;
+
+  // Check: if already used once and not logged in → show signup prompt
+  if (hasUsedOnce() && !TOKEN) {
+    document.getElementById('signupPrompt').style.display = 'flex';
+    return;
+  }
+
+  await runFlow(raw);
+});
+
+async function runFlow(raw) {
+  setBusy(true);
+  showStatus('Analyzing your site...');
+  showResults();
+  hideError();
+
+  try {
+    const a = await fetchJson('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: raw }),
+    });
+
+    currentSessionId = a.sessionId;
+    renderBrand(a.analysis);
+
+    showStatus('Sourcing products & verifying real supplier listings...');
+    const s = await fetchJson('/api/source', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: currentSessionId, analysis: a.analysis }),
+    });
+
+    currentSessionId = s.sessionId || currentSessionId;
+    renderProducts(s.products);
+    hideStatus();
+    revealBody();
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    markUsed();
+
+    // Show "Try another" or "Create account" below results
+    if (!TOKEN) {
+      document.getElementById('accountWall').style.display = 'block';
+      document.getElementById('accountWall').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  } catch (err) {
+    console.error(err);
+    hideStatus();
+    showError(err.message || 'Something went wrong.');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function fetchJson(url, options) {
+  const res = await fetch(url, options);
+  let data;
+  try { data = await res.json(); } catch { throw new Error('Server error'); }
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+function setBusy(busy) {
+  analyzeBtn.disabled = busy;
+  analyzeBtn.textContent = busy ? 'Working...' : 'Analyze & Source →';
+  urlInput.disabled = busy;
+}
+
+function showResults() { document.getElementById('results').style.display = 'block'; }
+function showStatus(msg) {
+  document.getElementById('statusBox').style.display = 'flex';
+  document.getElementById('resultBody').style.display = 'none';
+  document.getElementById('statusText').textContent = msg;
+}
+function hideStatus() { document.getElementById('statusBox').style.display = 'none'; }
+function revealBody() { document.getElementById('resultBody').style.display = 'block'; }
+function showError(msg) {
+  document.getElementById('resultError').style.display = 'block';
+  document.getElementById('resultError').textContent = '× ' + msg;
+}
+function hideError() { document.getElementById('resultError').style.display = 'none'; }
+
+function renderBrand(a) {
+  document.getElementById('brandHeading').textContent = a.brandName || 'Brand Analysis';
+  const card = document.getElementById('brandCard');
+  card.innerHTML = '';
+  addField('Brand', a.brandName || '—');
+  addField('Niche', a.niche || '—');
+  addField('Product types', (Array.isArray(a.productTypes) ? a.productTypes.join(', ') : '—'));
+  addField('Price range', a.priceRange ? '$' + a.priceRange.min + ' – $' + a.priceRange.max : '—');
+  addField('Target audience', a.targetAudience || '—');
+  if (a.summary) addField('Summary', a.summary);
+}
+
+function addField(label, value) {
+  const w = document.createElement('div'); w.className = 'ba-field';
+  const l = document.createElement('div'); l.className = 'ba-label'; l.textContent = label;
+  const v = document.createElement('div'); v.className = 'ba-value'; v.textContent = value;
+  w.appendChild(l); w.appendChild(v);
+  document.getElementById('brandCard').appendChild(w);
+}
+
+function renderProducts(products) {
+  currentProducts = products || [];
+  const grid = document.getElementById('productGrid');
+  grid.innerHTML = '';
+  const total = products.length;
+  const FREE_LIMIT = 5;
+  const lockedCount = Math.max(0, total - FREE_LIMIT);
+  document.getElementById('productCount').textContent = total + ' sourced products · ' + Math.min(FREE_LIMIT, total) + ' free preview';
+
+  products.forEach((p, i) => {
+    const locked = i >= FREE_LIMIT;
+    const card = document.createElement('div');
+    card.className = 'product-card' + (locked ? ' locked' : '');
+    const emoji = escHtml(p.emoji || '📦');
+    const verified = p.realListing && p.realListing.url;
+    const supplierLabel = verified ? p.realListing.supplier || p.supplier : p.supplier;
+    card.innerHTML =
+      '<div class="product-image-wrap"><div class="product-image-fallback">' + emoji + '</div>' + (p.imageUrl ? '<img alt="' + escAttr(p.name) + '" loading="lazy" />' : '') + (verified ? '<div class="product-verified">✓ Verified</div>' : '') + '</div>' +
+      '<div class="product-name">' + escHtml(p.name) + '</div>' +
+      '<div class="product-supplier">' + escHtml(supplierLabel) + '</div>' +
+      '<div class="product-desc">' + escHtml(p.description || '') + '</div>' +
+      '<div class="product-meta"><div class="product-prices">Cost <strong>$' + fmt(p.costPrice) + '</strong> · Sell <strong>$' + fmt(p.sellPrice) + '</strong></div><div class="product-margin">+' + p.marginPercent + '%</div></div>' +
+      (locked ? '<div class="lock-overlay"><div class="lock-icon">🔒</div><div class="lock-text">' + lockedCount + ' more locked</div><button class="lock-cta" type="button" onclick="document.getElementById(\'signupPrompt\').style.display=\'flex\'">Unlock all — $15/mo</button></div>' : '');
+
+    const img = card.querySelector('img');
+    if (img && p.imageUrl) {
+      img.addEventListener('load', () => img.classList.add('loaded'));
+      img.addEventListener('error', () => img.remove());
+      img.src = p.imageUrl;
+    }
+    if (!locked) {
+      card.title = 'Click for details';
+      card.addEventListener('click', () => openProductModal(i));
+    }
+    grid.appendChild(card);
+  });
+}
+
+function openProductModal(index) {
+  const p = currentProducts[index];
+  if (!p) return;
+  document.getElementById('pmEmoji').textContent = p.emoji || '📦';
+  document.getElementById('pmName').textContent = p.name || '';
+  document.getElementById('pmChinese').textContent = p.chineseName ? '中文 · ' + p.chineseName : '';
+  document.getElementById('pmDesc').textContent = p.description || '';
+  document.getElementById('pmCost').textContent = '$' + fmt(p.costPrice);
+  document.getElementById('pmSell').textContent = '$' + fmt(p.sellPrice);
+  document.getElementById('pmMargin').textContent = '+' + (p.marginPercent || 0) + '%';
+  document.getElementById('pmMoq').textContent = p.moqEstimate || '—';
+  document.getElementById('pmLead').textContent = p.leadTime || '—';
+  document.getElementById('pmSupplier').textContent = p.supplier || '—';
+  const links = document.getElementById('pmLinks');
+  links.innerHTML = '';
+  if (p.realListing && p.realListing.url) {
+    const a = document.createElement('a'); a.className = 'pm-link';
+    a.style.borderColor = 'var(--border-jade)'; a.style.background = 'rgba(0,229,160,0.06)';
+    a.href = p.realListing.url; a.target = '_blank'; a.rel = 'noopener';
+    a.innerHTML = '<span class="pm-link-label">✓ Verified listing on ' + escHtml(p.realListing.supplier || 'supplier') + ' →</span><span class="pm-link-note">' + escHtml((p.realListing.title || '').slice(0, 110)) + '</span>';
+    links.appendChild(a);
+  }
+  (p.links || []).forEach((l) => {
+    const a = document.createElement('a'); a.className = 'pm-link';
+    a.href = l.url; a.target = '_blank'; a.rel = 'noopener';
+    a.innerHTML = '<span class="pm-link-label">' + escHtml(l.label) + ' →</span><span class="pm-link-note">' + escHtml(l.note || '') + '</span>';
+    links.appendChild(a);
+  });
+  document.getElementById('productModal').style.display = 'flex';
+}
+
+function closeProductModal() { document.getElementById('productModal').style.display = 'none'; }
+
+document.getElementById('tryAnotherBtn').addEventListener('click', () => {
+  if (hasUsedOnce() && !TOKEN) {
+    document.getElementById('signupPrompt').style.display = 'flex';
+    return;
+  }
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('accountWall').style.display = 'none';
+  urlInput.value = '';
+  urlInput.focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+function fmt(n) { const v = Number(n); if (!isFinite(v)) return '0'; return v % 1 === 0 ? v.toFixed(0) : v.toFixed(2); }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return escHtml(s); }
+
+// Modal close handlers
+document.querySelectorAll('.modal, .premium-overlay').forEach((m) => {
+  m.addEventListener('click', (e) => { if (e.target === m) m.style.display = 'none'; });
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal, .premium-overlay').forEach((m) => m.style.display = 'none');
+  }
+});
+</script>
+</body>
+</html>

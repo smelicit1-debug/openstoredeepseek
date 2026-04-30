@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign In — OpenStore.ai</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #06080D; --bg2: #0C1018; --bg3: #121820;
+    --jade: #00E5A0; --jade2: #00C285;
+    --text: #F0F4FF; --muted: #8892A4;
+    --border: rgba(255,255,255,0.07); --error: #FF5470;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 16px; line-height: 1.6;
+    min-height: 100vh; display: flex; flex-direction: column;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+    background-size: 60px 60px; pointer-events: none; z-index: 0;
+  }
+  * { position: relative; z-index: 1; }
+
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.25rem 4rem; border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px); background: rgba(6,8,13,0.8);
+  }
+  .logo { font-family: 'Syne', sans-serif; font-size: 1.35rem; font-weight: 800; text-decoration: none; color: var(--text); }
+  .logo span { color: var(--jade); }
+  .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+  .nav-links a:hover { color: var(--text); }
+
+  .auth-container {
+    flex: 1; display: flex; align-items: center; justify-content: center; padding: 3rem 1rem;
+  }
+  .auth-card {
+    width: 100%; max-width: 420px; border: 1px solid var(--border); border-radius: 16px;
+    padding: 2.5rem; background: var(--bg2);
+  }
+  .auth-card h1 { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .auth-card .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+  .form-group { margin-bottom: 1.25rem; }
+  .form-group label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.4rem; }
+  .form-group input {
+    width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text); font-size: 0.95rem; outline: none; transition: border-color 0.2s;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .form-group input:focus { border-color: var(--jade); box-shadow: 0 0 0 3px rgba(0,229,160,0.1); }
+  .btn-primary {
+    width: 100%; padding: 0.75rem; border: 1px solid var(--jade); border-radius: 8px;
+    color: var(--bg); background: var(--jade); font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .btn-primary:hover { background: var(--jade2); border-color: var(--jade2); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .auth-error {
+    background: rgba(255,84,112,0.1); border: 1px solid rgba(255,84,112,0.3); border-radius: 8px;
+    padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--error); margin-bottom: 1rem; display: none;
+  }
+  .auth-footer { text-align: center; margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted); }
+  .auth-footer a { color: var(--jade); text-decoration: none; }
+  .auth-footer a:hover { text-decoration: underline; }
+  .success-msg { text-align: center; padding: 2rem; display: none; }
+  .success-msg h2 { color: var(--jade); margin-bottom: 1rem; }
+
+  @media (max-width: 768px) { nav { padding: 1rem 1.5rem; } }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Open<span>Store</span>.ai</a>
+  <div class="nav-links"><a href="/">← Back</a></div>
+</nav>
+
+<div class="auth-container">
+  <div class="auth-card">
+    <div id="formView">
+      <h1 id="formTitle">Sign In</h1>
+      <div class="sub" id="formSub">Access your OpenStore.ai account</div>
+      <div class="auth-error" id="authError"></div>
+      <form id="authForm">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="you@example.com" required autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="At least 6 characters" required minlength="6" autocomplete="current-password" />
+        </div>
+        <button type="submit" class="btn-primary" id="submitBtn">Sign In</button>
+      </form>
+      <div class="auth-footer" id="authFooter">
+        <span id="toggleText">Don't have an account?</span>
+        <a href="#" id="toggleLink">Sign Up</a>
+      </div>
+    </div>
+    <div class="success-msg" id="successView">
+      <h2>✓ Account Created</h2>
+      <p style="color:var(--muted);margin-bottom:1.5rem;">You're being redirected to the dashboard...</p>
+      <div style="width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--jade);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto;"></div>
+    </div>
+  </div>
+</div>
+
+<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const isSignup = params.get('signup') === '1';
+
+let mode = isSignup ? 'signup' : 'login';
+
+const formTitle = document.getElementById('formTitle');
+const formSub = document.getElementById('formSub');
+const submitBtn = document.getElementById('submitBtn');
+const toggleText = document.getElementById('toggleText');
+const toggleLink = document.getElementById('toggleLink');
+const authError = document.getElementById('authError');
+const authForm = document.getElementById('authForm');
+const formView = document.getElementById('formView');
+const successView = document.getElementById('successView');
+const passwordInput = document.getElementById('password');
+
+function setMode(m) {
+  mode = m;
+  if (m === 'signup') {
+    formTitle.textContent = 'Create Account';
+    formSub.textContent = 'Start sourcing products with AI';
+    submitBtn.textContent = 'Create Account →';
+    toggleText.textContent = 'Already have an account?';
+    toggleLink.textContent = 'Sign In';
+    passwordInput.minLength = '6';
+  } else {
+    formTitle.textContent = 'Sign In';
+    formSub.textContent = 'Access your OpenStore.ai account';
+    submitBtn.textContent = 'Sign In';
+    toggleText.textContent = "Don't have an account?";
+    toggleLink.textContent = 'Sign Up';
+    passwordInput.removeAttribute('minlength');
+  }
+  authError.style.display = 'none';
+}
+
+toggleLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  setMode(mode === 'login' ? 'signup' : 'login');
+});
+
+authForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  if (!email || !password) {
+    showError('Please fill in all fields.');
+    return;
+  }
+  if (mode === 'signup' && password.length < 6) {
+    showError('Password must be at least 6 characters.');
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Please wait...';
+  authError.style.display = 'none';
+
+  try {
+    const endpoint = mode === 'signup' ? '/api/auth/register' : '/api/auth/login';
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Authentication failed.');
+
+    localStorage.setItem('os_token', data.token);
+    localStorage.setItem('os_user', JSON.stringify(data.user));
+
+    if (mode === 'signup') {
+      formView.style.display = 'none';
+      successView.style.display = 'block';
+      setTimeout(() => { window.location.href = '/dashboard'; }, 1000);
+    } else {
+      window.location.href = '/dashboard';
+    }
+  } catch (err) {
+    showError(err.message);
+    submitBtn.disabled = false;
+    submitBtn.textContent = mode === 'signup' ? 'Create Account →' : 'Sign In';
+  }
+});
+
+function showError(msg) {
+  authError.textContent = '× ' + msg;
+  authError.style.display = 'block';
+}
+
+setMode(mode);
+</script>
+</body>
+</html>
