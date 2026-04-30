@@ -387,41 +387,60 @@ app.post('/api/auth/register', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
 
     const sb = getSupabase();
-    if (!sb) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!sb || !supabaseUrl || !anonKey) {
       // Dev mode — no Supabase, create fake user
       const user = { id: newSessionId(), email, tier: 'free', uses_this_month: 0 };
       const token = generateToken(user);
       return res.json({ token, user });
     }
 
-    const { data, error } = await sb.auth.signUp({ email, password });
-    if (error) return res.status(400).json({ error: error.message });
-
-    // Auto-confirm the user (skip email verification)
+    // Use Supabase Auth REST API directly
+    const signupHeaders = { apikey: anonKey, 'Content-Type': 'application/json' };
+    let userId;
     try {
-      await sb.auth.admin.updateUserById(data.user.id, { email_confirm: true });
-    } catch {
-      // Fallback: use direct REST call
-      await axios.put(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users/${data.user.id}`,
-        { email_confirm: true },
-        {
-          headers: {
-            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-          },
-        }
-      ).catch(() => {});
+      const signupRes = await axios.post(
+        `${supabaseUrl}/auth/v1/signup`,
+        { email, password },
+        { headers: signupHeaders }
+      );
+      userId = signupRes.data?.id;
+      if (!userId) throw new Error('No user ID returned');
+    } catch (signupErr) {
+      // If rate limited, create user directly via admin API
+      const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const adminRes = await axios.post(
+        `${supabaseUrl}/auth/v1/admin/users`,
+        { email, password, email_confirm: true },
+        { headers: { apikey: adminKey, Authorization: `Bearer ${adminKey}`, 'Content-Type': 'application/json' } }
+      );
+      userId = adminRes.data?.id;
+      if (!userId) throw new Error(signupErr.response?.data?.msg || 'Registration failed');
     }
 
-    // Create user profile
-    await sb.from('users').upsert({ id: data.user.id, email, tier: 'free', uses_this_month: 0, created_at: new Date().toISOString() });
+    // Auto-confirm the user via admin API
+    const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    try {
+      await axios.put(
+        `${supabaseUrl}/auth/v1/admin/users/${userId}`,
+        { email_confirm: true },
+        { headers: { apikey: adminKey, Authorization: `Bearer ${adminKey}` } }
+      );
+    } catch { /* already confirmed */ }
 
-    const token = generateToken({ id: data.user.id, email, tier: 'free' });
-    res.json({ token, user: { id: data.user.id, email, tier: 'free' } });
+    // Create user profile
+    await sb.from('users').upsert({
+      id: userId, email, tier: 'free', uses_this_month: 0,
+      created_at: new Date().toISOString(),
+    });
+
+    const token = generateToken({ id: userId, email, tier: 'free' });
+    res.json({ token, user: { id: userId, email, tier: 'free' } });
   } catch (err) {
     console.error('register error:', err.message);
-    res.status(500).json({ error: 'Registration failed.' });
+    res.status(500).json({ error: err.response?.data?.msg || err.message || 'Registration failed.' });
   }
 });
 
@@ -431,22 +450,33 @@ app.post('/api/auth/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
 
     const sb = getSupabase();
-    if (!sb) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!sb || !supabaseUrl || !anonKey) {
       // Dev mode — accept any credentials
       const user = { id: newSessionId(), email, tier: 'free', uses_this_month: 0 };
       const token = generateToken(user);
       return res.json({ token, user });
     }
 
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) return res.status(401).json({ error: error.message });
+    // Use Supabase Auth REST API directly
+    const { data } = await axios.post(
+      `${supabaseUrl}/auth/v1/token?grant_type=password`,
+      { email, password },
+      { headers: { apikey: anonKey, 'Content-Type': 'application/json' } }
+    );
 
-    const profile = await getUser(data.user.id);
-    const token = generateToken({ id: data.user.id, email, tier: profile.tier || 'free' });
-    res.json({ token, user: { id: data.user.id, email, tier: profile.tier || 'free', uses_this_month: profile.uses_this_month || 0 } });
+    const userId = data?.user?.id;
+    if (!userId) throw new Error('Invalid credentials');
+
+    const profile = await getUser(userId);
+    const token = generateToken({ id: userId, email, tier: profile.tier || 'free' });
+    res.json({ token, user: { id: userId, email, tier: profile.tier || 'free', uses_this_month: profile.uses_this_month || 0 } });
   } catch (err) {
     console.error('login error:', err.message);
-    res.status(500).json({ error: 'Login failed.' });
+    const msg = err.response?.data?.error_description || err.response?.data?.msg || err.message;
+    res.status(401).json({ error: msg || 'Login failed.' });
   }
 });
 
