@@ -1,0 +1,9 @@
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+cmds = ["npm ci --omit=dev"]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "node server.js"
