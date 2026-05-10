@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
@@ -17,9 +18,63 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ─── Middleware ────────────────────────────────────────────────────
-app.use(cors({ origin: process.env.BASE_URL || '*', credentials: true }));
+const corsOrigin = process.env.BASE_URL
+  ? process.env.BASE_URL
+  : process.env.NODE_ENV === 'production'
+    ? false  // Disable CORS in production if BASE_URL not set
+    : '*';
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
+
+// Security headers
+app.use((req, res, next) => {
+  // Prevent MIME type sniffing
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Prevent clickjacking
+  res.setHeader('X-Frame-Options', 'DENY');
+  // Enforce HTTPS in production
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  // Referrer policy
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Content Security Policy (basic)
+  res.setHeader('Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:; frame-ancestors 'none'"
+  );
+  // Prevent XSS via old IE
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
+// ─── Rate Limiters ─────────────────────────────────────────────────
+// Auth endpoints: strict rate limiting to prevent brute-force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per window
+  message: { error: 'Too many attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Analyze/source endpoints: prevent resource exhaustion
+const analysisLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20, // 20 analyses per hour
+  message: { error: 'Analysis rate limit exceeded. Please wait and try again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// General API limiter
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per window
+  message: { error: 'Rate limit exceeded. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ─── Configuration ─────────────────────────────────────────────────
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY || '';
@@ -71,7 +126,7 @@ function canAnalyze(user) {
 
 // ─── Firecrawl ─────────────────────────────────────────────────────
 async function firecrawlSearch(query, { limit = 5, sites = [] } = {}) {
-  if (!FIRECRAWL_API_KEY) return [];
+  if (!FIRECRAWL_API_KEY) { console.warn('[firecrawl] No API key configured'); return []; }
   const scoped = sites.length
     ? `${query} (${sites.map((s) => `site:${s}`).join(' OR ')})`
     : query;
@@ -87,7 +142,8 @@ async function firecrawlSearch(query, { limit = 5, sites = [] } = {}) {
         timeout: 30000,
       }
     );
-    const list = data?.data?.web || data?.data || data?.results || [];
+    // Resilient extraction: try 3 known response shapes + fallback
+    const list = extractFirecrawlResults(data);
     return (Array.isArray(list) ? list : [])
       .map((r) => ({
         url: r.url || r.link || '',
@@ -96,13 +152,14 @@ async function firecrawlSearch(query, { limit = 5, sites = [] } = {}) {
       }))
       .filter((r) => r.url);
   } catch (err) {
-    console.error('Firecrawl search failed:', err.response?.data?.error || err.message);
+    console.error(`[firecrawl] search failed for "${query.slice(0, 60)}":`, err.response?.data?.error || err.message);
     return [];
   }
 }
 
 async function firecrawlSearchListings(query, sites, { limit = 3, scrape = false } = {}) {
-  if (!FIRECRAWL_API_KEY || !query) return [];
+  if (!FIRECRAWL_API_KEY) { console.warn('[firecrawl] No API key configured'); return []; }
+  if (!query) return [];
   const scoped = sites.length
     ? `${query} (${sites.map((s) => `site:${s}`).join(' OR ')})`
     : query;
@@ -118,7 +175,7 @@ async function firecrawlSearchListings(query, sites, { limit = 3, scrape = false
       },
       timeout: 60000,
     });
-    const list = data?.data?.web || data?.data || [];
+    const list = extractFirecrawlResults(data);
     return (Array.isArray(list) ? list : [])
       .map((r) => ({
         url: r.url || r.link || '',
@@ -131,7 +188,7 @@ async function firecrawlSearchListings(query, sites, { limit = 3, scrape = false
       }))
       .filter((r) => r.url);
   } catch (err) {
-    console.error('Firecrawl search failed:', err.response?.data?.error || err.message);
+    console.error(`[firecrawl] listing search failed for "${query.slice(0, 60)}":`, err.response?.data?.error || err.message);
     return [];
   }
 }
@@ -144,15 +201,60 @@ function extractFirstImage(md) {
   return m2 ? m2[1] : '';
 }
 
+/**
+ * Resilient Firecrawl response extraction — handles multiple API response shapes.
+ */
+function extractFirecrawlResults(data) {
+  if (!data) return [];
+  // v2: data.data.web[]  |  v1: data.data[]  |  data.results[]  |  any array root
+  return data?.data?.web || data?.data || data?.results || data?.success?.data || [];
+}
+
 async function findRealListing(searchEn, searchZh) {
   const enSites = ['alibaba.com', 'aliexpress.com', 'made-in-china.com', 'globalsources.com'];
-  let results = await firecrawlSearchListings(searchEn, enSites, { limit: 3, scrape: true });
-  let best = results.find((r) => r.image) || results[0];
-  if (!best && searchZh) {
-    results = await firecrawlSearchListings(searchZh, ['1688.com', 'alibaba.com'], { limit: 3, scrape: true });
-    best = results.find((r) => r.image) || results[0];
+
+  // Score URLs: product pages > category pages > search pages > everything else
+  function scoreResult(r) {
+    let score = 1;
+    const url = (r.url || '').toLowerCase();
+    // Strong product page signals
+    if (/\/product\//.test(url)) score += 3;
+    if (/\/item\//.test(url)) score += 3;
+    if (/\/offer\//.test(url)) score += 2;
+    if (/\/detail\//.test(url)) score += 2;
+    if (/\/goods\//.test(url)) score += 2;
+    if (/\/selloffer\//.test(url)) score += 2;
+    // Has image → bonus (often means a proper listing page)
+    if (r.image) score += 1;
+    // Has a specific product ID in URL → more likely a real product
+    if (/\/dp\//.test(url) || /\/(?:[a-z0-9]{8,})\b/.test(url)) score += 1;
+    // Search/list pages → penalty
+    if (/search|list|category/.test(url)) score -= 1;
+    return score;
   }
+
+  const results = [];
+  // English search: get more results to pick from
+  const enResults = await firecrawlSearchListings(searchEn, enSites, { limit: 5, scrape: true });
+  for (const r of enResults) results.push(r);
+
+  // Chinese search: always try, often yields better 1688 matches
+  if (searchZh) {
+    const zhResults = await firecrawlSearchListings(searchZh, ['1688.com', 'alibaba.com'], { limit: 5, scrape: true });
+    for (const r of zhResults) results.push(r);
+  }
+
+  // Deduplicate by URL and pick the best
+  const seen = new Set();
+  const scored = results
+    .filter(r => { const k = r.url; if (seen.has(k)) return false; seen.add(k); return true; })
+    .map(r => ({ ...r, _score: scoreResult(r) }))
+    .sort((a, b) => b._score - a._score);
+
+  const best = scored[0];
   if (!best) return null;
+
+  console.log(`[findRealListing] Best result for "${searchEn.slice(0, 40)}" — score ${best._score}: ${best.title.slice(0, 60)}`);
   return {
     url: best.url,
     title: best.title,
@@ -286,10 +388,17 @@ Rules:
 
 // ─── AI: Product Sourcing ──────────────────────────────────────────
 async function sourceProducts(analysis) {
-  const prompt = `You are a senior product sourcing agent for Chinese suppliers (1688, Alibaba, CJ Dropshipping). Recommend 6 to 10 products that fit this brand.
+  const prompt = `You are a senior product sourcing agent for Chinese suppliers (1688, Alibaba, CJ Dropshipping). Recommend 8 to 12 specific, real products that fit this brand.
 
 Brand analysis:
 ${JSON.stringify(analysis, null, 2)}
+
+CRITICAL: The system will search Alibaba/1688/other platforms using your searchQuery and chineseName. If your search queries are vague or generic, NO real products will be found and the user gets nothing.
+
+RULES FOR GOOD SEARCH QUERIES:
+- searchQuery: Must be a SPECIFIC product name a supplier would list (e.g. "TWS Bluetooth 5.3 earphones with ANC noise cancelling" NOT "wireless earbuds")
+- chineseName: Chinese translation of the specific product (e.g. "蓝牙5.3主动降噪TWS耳机" NOT "无线耳机")
+- Each product must be a real, buyable product — not a category or abstract concept
 
 Return ONLY a strict JSON array, no prose, no code fences. Each item must have:
 {
@@ -311,7 +420,9 @@ Rules:
 - Sell prices must align with the brand's price range.
 - Mix supplier sources across the list.
 - Margins should be realistic (typically 200-800%).
-- Return between 6 and 10 items.`;
+- Return between 8 and 12 items.
+- searchQuery should be 5-15 specific keywords that would match a real supplier listing.
+- Do NOT use generic queries like "fashion t-shirts" — use "heavyweight 240gsm cotton oversized tee streetwear"`;
 
   const text = await callKimi(prompt, 2048);
   const raw = parseJson(text);
@@ -342,7 +453,10 @@ Rules:
 
   const final = [];
   for (const { c, listing } of enriched) {
-    if (FIRECRAWL_API_KEY && !listing) { console.log(`[source] dropped "${c.name}" — no real listing`); continue; }
+    const isUnverified = FIRECRAWL_API_KEY && !listing;
+    if (isUnverified) {
+      console.log(`[source] "${c.name}" — no Firecrawl listing found, keeping as unverified`);
+    }
     const product = {
       id: final.length, name: c.name, emoji: c.emoji, costPrice: c.costPrice, sellPrice: c.sellPrice,
       marginPercent: c.marginPercent, supplier: c.supplier, description: c.description,
@@ -350,6 +464,7 @@ Rules:
       leadTime: c.leadTime, supplierUrl: listing?.url || c.supplierUrl, links: c.links,
       imageUrl: listing?.image || buildImageUrl(c.imagePrompt, c._idx),
       realListing: listing || null,
+      unverified: isUnverified,
     };
     final.push(product);
   }
@@ -381,7 +496,7 @@ function newSessionId() {
 }
 
 // ─── API: Auth ─────────────────────────────────────────────────────
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
@@ -444,7 +559,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
@@ -486,7 +601,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
 });
 
 // ─── API: Billing ──────────────────────────────────────────────────
-app.post('/api/billing/create-checkout', requireAuth, async (req, res) => {
+app.post('/api/billing/create-checkout', authLimiter, requireAuth, async (req, res) => {
   if (!stripe) return res.status(503).json({ error: 'Billing not configured.' });
 
   try {
@@ -567,7 +682,7 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
 });
 
 // ─── API: Analyze ──────────────────────────────────────────────────
-app.post('/api/analyze', optionalAuth, async (req, res) => {
+app.post('/api/analyze', analysisLimiter, optionalAuth, async (req, res) => {
   try {
     const url = normalizeUrl(req.body && req.body.url);
     if (!url) return res.status(400).json({ error: 'A valid URL is required.' });
@@ -609,7 +724,7 @@ app.post('/api/analyze', optionalAuth, async (req, res) => {
 });
 
 // ─── API: Source Products ──────────────────────────────────────────
-app.post('/api/source', optionalAuth, async (req, res) => {
+app.post('/api/source', analysisLimiter, optionalAuth, async (req, res) => {
   try {
     const { sessionId, analysis } = req.body || {};
     let workingAnalysis = analysis;
@@ -691,7 +806,7 @@ app.post('/api/source', optionalAuth, async (req, res) => {
 });
 
 // ─── API: Deep Search ──────────────────────────────────────────────
-app.post('/api/deep-search', optionalAuth, async (req, res) => {
+app.post('/api/deep-search', analysisLimiter, optionalAuth, async (req, res) => {
   try {
     const { sessionId, productIndex } = req.body || {};
     if (!sessionId || productIndex === undefined) return res.status(400).json({ error: 'sessionId and productIndex required.' });
@@ -809,6 +924,11 @@ app.get('/api/export/:sessionId', requireAuth, async (req, res) => {
     }
     if (!sessionData || !sessionData.products) return res.status(404).json({ error: 'Session not found or no products to export.' });
 
+    // TENANT ISOLATION: Verify session belongs to authenticated user
+    if (sessionData.user_id && sessionData.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied. Session does not belong to you.' });
+    }
+
     const wb = new ExcelJS.Workbook();
     wb.creator = 'OpenStore.ai';
     wb.created = new Date();
@@ -848,7 +968,14 @@ app.get('/api/usage', requireAuth, async (req, res) => {
 });
 
 // ─── API: Health ───────────────────────────────────────────────────
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', (_req, res) => {
+  const railwayKeys = Object.keys(process.env).filter(k => k.toLowerCase().includes('railway') || k.startsWith('RAILWAY_'));
+  res.json({
+    ok: true,
+    NODE_ENV: process.env.NODE_ENV || 'not set',
+    railway: railwayKeys.reduce((acc, k) => { acc[k] = process.env[k] ? 'set' : 'not set'; return acc; }, {}),
+  });
+});
 
 // ─── Serve Frontend & Static Files ─────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public'), {
